@@ -1,6 +1,6 @@
 # # # # 
-# reclassify input NALCMS LandCover Map to classes useful in the 
-#  ALRESCO Fire Model
+# reclassify input NALCMS LandCover Map to classes useful in the ALRESCO Fire Model
+#  using pre-processed ancillary layers.
 # # # #
 
 # NOTES:  
