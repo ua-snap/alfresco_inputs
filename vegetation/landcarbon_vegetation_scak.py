@@ -35,7 +35,7 @@ if __name__ == '__main__':
 	from geolib_snap import reclassify
 
 	# some initial setup
-	version_num = 'v0_3'
+	version_num = 'v0_4'
 	input_dir = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Input_Data/seak'
 	output_dir = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Output_Data'
 	os.chdir( output_dir )
