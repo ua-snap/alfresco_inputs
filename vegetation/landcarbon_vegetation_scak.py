@@ -71,4 +71,3 @@ if __name__ == '__main__':
 	output_rst = reclassify( lc, reclass_list, output_filename, band=1, creation_options={'compress'='lzw'} )
 	output_rst.close()
 
-
