@@ -34,17 +34,15 @@ if __name__ == '__main__':
 	from geolib_snap import reclassify
 
 	# some initial setup
-	version_num = 'v0_3'
-	input_dir = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Input_Data/seak'
+	version_num = 'v0_4'
+	input_dir = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Input_Data/kodiak'
 	output_dir = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Output_Data'
 	os.chdir( output_dir )
 	
 	# # THIS NEEDS UPDATING TO THE KODIAK MAP NEEDS!
 	input_paths = { 
-			'lc01':os.path.join( input_dir, 'NLCD_land_cover_AKNPLCC.tif' ),
-			'cp01':os.path.join( input_dir, 'NLCD_pct_canopy_AKNPLCC.tif' ),
-			'logged':os.path.join( input_dir, 'AKNPLCC_2ndGrowth.tif' ),
-			'seak_mask':os.path.join( input_dir, 'seak_aoi.tif' )			
+			'lc01':os.path.join( input_dir, 'ak_nlcd_2001_land_cover_3130_KodiakIsland_3338.tif' ),
+			'kodiak_mask':os.path.join( input_dir, 'kodiak_aoi_box.tif' )
 	}
 
 	# reclassify
@@ -52,4 +50,5 @@ if __name__ == '__main__':
 
 	output_filename = os.path.join( output_dir, 'landcarbon_model_vegetation_input_kodiak_2001_' + version_num + '.tif' )
 	reclass_list = [[11,32,1],[41,42,3],[42,43,10],[51,52,4],[52,53,15],[71,72,5],[72,73,6],[90,91,4],[95,96,6]]
-	out_rst = reclassify( lc, reclass_list, output_filename, band=1, creation_options={'compress'='lzw'} )
+	out_rst = reclassify( lc, reclass_list, output_filename, band=1, creation_options={'compress':'lzw'} )
+	out_rst.close()
