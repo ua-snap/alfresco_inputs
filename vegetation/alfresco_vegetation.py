@@ -39,7 +39,7 @@ def replace_erroneous_treeline( lc2d, tl2d ):
 						  (i+1,j+0), 
 						  (i+1,j+1)]
 						for i,j in ind_zip ]
-		new_ind = []
+		
 		for count, group in enumerate( index_groups ):
 			cols = np.array( [j for i,j in group] )
 			rows = np.array( [i for i,j in group] )
@@ -64,16 +64,17 @@ if __name__ == '__main__':
 
 	# this should be something passed in at the command line
 	gs_value = 6.5
+	input_dir = '/workspace/UA/malindgren/projects/NALCMS_Veg_reClass/August2012_FINALversion/ALFRESCO_VegMap_Ancillary'
 	output_dir = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Output_Data'
 	output_veg = os.path.join( output_dir, 'alfresco_model_vegetation_input_2005.tif' )
 	input_paths = {
-		'lc05':"/workspace/UA/malindgren/projects/NALCMS_Veg_reClass/August2012_FINALversion/ALFRESCO_VegMap_Ancillary/na_landcover_2005_1km_MASTER.tif",
-		'north_south':"/workspace/UA/malindgren/projects/NALCMS_Veg_reClass/August2012_FINALversion/ALFRESCO_VegMap_Ancillary/AKCanada_1km_NorthSouth_FlatWater_999_MASTER.tif",
-		'mask':"/workspace/UA/malindgren/projects/NALCMS_Veg_reClass/August2012_FINALversion/ALFRESCO_VegMap_Ancillary/mask_for_finalization_alfresco_VegMap.tif",
-		'gs_temp':"/workspace/UA/malindgren/projects/NALCMS_Veg_reClass/August2012_FINALversion/ALFRESCO_VegMap_Ancillary/AKCanada_gs_temp_mean_MJJAS_1961_1990_climatology_1km_bilinear_MASTER.tif",
-		'coast_spruce_bog':"/workspace/UA/malindgren/projects/NALCMS_Veg_reClass/August2012_FINALversion/ALFRESCO_VegMap_Ancillary/Coastal_vs_Woody_wetlands_MASTER.tif",
-		'treeline':"/workspace/UA/malindgren/projects/NALCMS_Veg_reClass/August2012_FINALversion/ALFRESCO_VegMap_Ancillary/CAVM_treeline_AKCanada_1km_commonExtent_MASTER.tif",
-		'NoPac':"/workspace/UA/malindgren/projects/NALCMS_Veg_reClass/August2012_FINALversion/ALFRESCO_VegMap_Ancillary/ALFRESCO_NorthPacMaritime_forVegMap.tif"
+		'lc05':os.path.join( input_dir, 'na_landcover_2005_1km_MASTER.tif'),
+		'north_south':os.path.join( input_dir, 'AKCanada_1km_NorthSouth_FlatWater_999_MASTER.tif'),
+		'mask':os.path.join( input_dir, 'mask_for_finalization_alfresco_VegMap.tif'),
+		'gs_temp':os.path.join( input_dir, 'AKCanada_gs_temp_mean_MJJAS_1961_1990_climatology_1km_bilinear_MASTER.tif'),
+		'coast_spruce_bog':os.path.join( input_dir, 'Coastal_vs_Woody_wetlands_MASTER.tif'),
+		'treeline':os.path.join( input_dir, 'CAVM_treeline_AKCanada_1km_commonExtent_MASTER.tif'),
+		'NoPac':os.path.join( input_dir, 'ALFRESCO_NorthPacMaritime_forVegMap.tif')
 	}
 
 	# collapse classes in the input landcover raster
@@ -106,7 +107,7 @@ if __name__ == '__main__':
 	# Reclass Sub-polar or polar grassland-lichen-moss as GRAMMINOID TUNDRA
 	lc_mod[ (lc_mod == 10) | (lc_mod == 12) ] = 5
 
-	# Take the SPRUCE placeholder class and parse it out in to WHITE / BLACK.
+	# Take the SPRUCE placeholder class and parse it out/workspace/UA/malindgren/projects/NALCMS_Veg_reClass/August2012_FINALversion/ALFRESCO_VegMap_Ancillary/ALFRESCO_NorthPacMaritime_forVegMap.tif in to WHITE / BLACK.
 	# White Spruce = SPRUCE class & on a South-ish Facing slope
 	north_south = rasterio.open( input_paths[ 'north_south' ] ).read_band(1)
 	north_south.fill_value = 9999
