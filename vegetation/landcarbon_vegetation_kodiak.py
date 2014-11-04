@@ -24,22 +24,20 @@
 #  ** 17 saltwater
 
 if __name__ == '__main__':
-	import os, sys, rasterio, fiona
+	import os, rasterio, fiona
 	from rasterio import features
 	from rasterio.warp import reproject, RESAMPLING
 	import numpy as np
-	import scipy as sp
 
 	# import local library of functions
 	os.chdir( '/workspace/Shared/Tech_Projects/AK_LandCarbon/project_data/CODE' )
-	from geolib_snap import *
+	from geolib_snap import reclassify
 
 	# some initial setup
 	version_num = 'v0_3'
 	input_dir = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Input_Data/seak'
 	output_dir = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Output_Data'
 	os.chdir( output_dir )
-	meta_updater = dict( driver='GTiff', dtype=rasterio.int16, compress='lzw', crs={'init':'EPSG:3338'}, count=1, nodata=None )
 	
 	# # THIS NEEDS UPDATING TO THE KODIAK MAP NEEDS!
 	input_paths = { 
@@ -52,6 +50,6 @@ if __name__ == '__main__':
 	# reclassify
 	lc = rasterio.open( input_paths[ 'lc01' ] )
 
-	output_filename = os.path.join( output_dir, 'landcarbon_model_vegetation_input_kodiak_2001.tif' )
+	output_filename = os.path.join( output_dir, 'landcarbon_model_vegetation_input_kodiak_2001_' + version_num + '.tif' )
 	reclass_list = [[11,32,1],[41,42,3],[42,43,10],[51,52,4],[52,53,15],[71,72,5],[72,73,6],[90,91,4],[95,96,6]]
 	out_rst = reclassify( lc, reclass_list, output_filename, band=1, creation_options={'compress'='lzw'} )

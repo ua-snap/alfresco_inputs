@@ -25,11 +25,10 @@
 #  ** 17 saltwater
 
 if __name__ == '__main__':
-	import os, sys, rasterio, fiona
+	import os, rasterio, fiona
 	from rasterio import features
 	from rasterio.warp import reproject, RESAMPLING
 	import numpy as np
-	import scipy as sp
 
 	# import local library of functions
 	os.chdir( '/workspace/Shared/Tech_Projects/AK_LandCarbon/project_data/CODE' )
@@ -49,25 +48,10 @@ if __name__ == '__main__':
 			'scak_mask':os.path.join( input_dir, 'scak_aoi.tif' )
 	}
 
-	# collapse initial undesired classes to noveg
+	# reclassify
 	lc = rasterio.open( input_paths[ 'lc01' ] )
-	lc_mod = lc.read_band( 1 )
-	lc_mod[ (lc_mod >= 0) & (lc_mod <= 31 ) ] = 1 # potentially 0 later on
 
-	# upland forest / fen
-	canopy = rasterio.open( input_paths[ 'cp01' ] ).read_band( 1 )
-	lc_mod[ (lc_mod == 42) & (canopy > 20) ] = 10
-	lc_mod[ (lc_mod == 42) & (canopy <= 20) ] = 12
-
-	# now reclass the rest
-	output_filename = os.path.join( output_dir, 'landcarbon_model_vegetation_step1.tif' )
-	meta = lc.meta 
-	with rasterio.open( output_filename, 'w', **meta ) as lc_mod_rst:
-		lc_mod_rst.write_band( 1, lc_mod )
-	
-	lc_mod_rst = rasterio.open( output_filename ) # reopen it
-	output_filename = os.path.join( output_dir, 'landcarbon_model_vegetation_input_scak_2001.tif' )
+	output_filename = os.path.join( output_dir, 'landcarbon_model_vegetation_input_scak_2001_' + version_num + '.tif' )
 	reclass_list = [ [0,32,1],[41,42,15],[42,43,2],[43,44,1],[51,53,4],[71,73,9],[90,91,4],[95,96,6] ]
 	output_rst = reclassify( lc, reclass_list, output_filename, band=1, creation_options={'compress'='lzw'} )
 	output_rst.close()
-

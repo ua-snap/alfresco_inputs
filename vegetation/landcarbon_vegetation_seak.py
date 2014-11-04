@@ -24,22 +24,16 @@
 #  ** 17 saltwater
 
 if __name__ == '__main__':
-	import os, sys, rasterio, fiona
+	import os, rasterio, fiona
 	from rasterio import features
 	from rasterio.warp import reproject, RESAMPLING
 	import numpy as np
-	import scipy as sp
-
-	# import local library of functions
-	os.chdir( '/workspace/Shared/Tech_Projects/AK_LandCarbon/project_data/CODE' )
-	from geolib_snap import *
-
+	
 	# some initial setup
 	version_num = 'v0_3'
 	input_dir = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Input_Data/seak'
 	output_dir = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Output_Data'
 	os.chdir( output_dir )
-	meta_updater = dict( driver='GTiff', dtype=rasterio.int16, compress='lzw', crs={'init':'EPSG:3338'}, count=1, nodata=None )
 	
 	input_paths = { 
 			'lc01':os.path.join( input_dir, 'NLCD_land_cover_AKNPLCC.tif' ),
@@ -72,7 +66,7 @@ if __name__ == '__main__':
 	meta = lc.meta
 	meta.update( crs={'init': u'epsg:3338'} )
 
-	output_filename = os.path.join( output_dir, 'landcarbon_model_vegetation_input_seak_2001.tif' )
+	output_filename = os.path.join( output_dir, 'landcarbon_model_vegetation_input_seak_2001_' + version_num + '.tif' )
 
 	with rasterio.open( output_filename, 'w', **meta ) as out:
 		out.write_band( 1, lc_mod )

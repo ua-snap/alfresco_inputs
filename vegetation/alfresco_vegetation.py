@@ -56,7 +56,6 @@ def replace_erroneous_treeline( lc2d, tl2d ):
 if __name__ == '__main__':
 	import rasterio, fiona, os, sys
 	import numpy as np
-	import scipy as sp
 
 	curdir = os.getcwd()
 	os.chdir( '/workspace/Shared/Tech_Projects/AK_LandCarbon/project_data/CODE' )
@@ -107,7 +106,7 @@ if __name__ == '__main__':
 	# Reclass Sub-polar or polar grassland-lichen-moss as GRAMMINOID TUNDRA
 	lc_mod[ (lc_mod == 10) | (lc_mod == 12) ] = 5
 
-	# Take the SPRUCE placeholder class and parse it out/workspace/UA/malindgren/projects/NALCMS_Veg_reClass/August2012_FINALversion/ALFRESCO_VegMap_Ancillary/ALFRESCO_NorthPacMaritime_forVegMap.tif in to WHITE / BLACK.
+	# Take the SPRUCE placeholder class and parse it out in to WHITE / BLACK.
 	# White Spruce = SPRUCE class & on a South-ish Facing slope
 	north_south = rasterio.open( input_paths[ 'north_south' ] ).read_band(1)
 	north_south.fill_value = 9999
@@ -129,7 +128,7 @@ if __name__ == '__main__':
 	mask = rasterio.open( input_paths[ 'mask' ] ).read_band( 1 )
 	lc_mod[ mask == 1 ] = 255
 
-	# change the type (byte) and write it out
+	# change the type ( byte ) and write it out
 	meta = lc.meta.copy()
 	meta.update( dtype=rasterio.uint8 )
 
