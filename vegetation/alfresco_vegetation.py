@@ -14,6 +14,41 @@
 # lc = (+1,0)
 # lr = (+1,+1)
 
+def reclassify( rasterio_rst, reclass_list, output_filename, band=1, creation_options=dict() ):
+	'''
+	MODIFIED: removed window walking...  too slow..
+
+	this function will take a raster image as input and
+	reclassify its values given in the reclass_list.
+	The reclass list is a simple list of lists with the 
+	following formatting:
+		[[begin_range, end_range, new_value]]
+		ie. [ [ 1,3,5 ],[ 3,4,6 ] ]
+			* which converts values 1 to 2.99999999 to 5
+				and values 3 to 3.99999999 to 6
+				all other values stay the same.
+	arguments:
+		rasterio_rst = raster image instance from rasterio package
+		reclass_list = list of reclassification values * see explanation
+		band = integer marking which band you wnat to return from the raster
+				default is 1.
+		creation_options = gdal style creation options, but in the rasterio implementation
+			* options must be in a dict where the key is the name of the gdal -co and the 
+			  value is the value passed to that flag.  
+			  i.e. 
+			  	["COMPRESS=LZW"] becomes dict([('compress','lzw')])
+	'''
+	# this will update the metadata if a creation_options dict is passed as an arg.
+	meta = rasterio_rst.meta
+	if len( creation_options ) < 0:
+		meta.update( creation_options )
+
+	with rasterio.open( output_filename, mode='w', **meta ) as out_rst:
+		band_arr = rasterio_rst.read_band( band )
+		for rcl in reclass_list:
+			band_arr[ np.logical_and( band_arr >= rcl[0], band_arr < rcl[1] ) ] = rcl[2]
+		out_rst.write_band( band, band_arr )
+	return rasterio.open( output_filename )
 
 def replace_erroneous_treeline( lc2d, tl2d ):
 	''' replace values based on neighbors of offenders and a where condition 
@@ -56,10 +91,6 @@ def replace_erroneous_treeline( lc2d, tl2d ):
 if __name__ == '__main__':
 	import rasterio, fiona, os, sys
 	import numpy as np
-
-	curdir = os.getcwd()
-	os.chdir( '/workspace/Shared/Tech_Projects/AK_LandCarbon/project_data/CODE' )
-	from geolib_snap import reclassify
 
 	# this should be something passed in at the command line
 	gs_value = 6.5
