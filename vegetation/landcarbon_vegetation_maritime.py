@@ -34,7 +34,7 @@ if __name__ == '__main__':
 
 	# # some initial setup
 	version_num = 'v0_4'
-	input_dir = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Input_Data/seak'
+	input_dir = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Input_Data/maritime'
 	output_dir = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Output_Data'
 	output_filename = os.path.join( output_dir, 'landcarbon_vegetation_modelinput_maritime_2001_' + version_num + '.tif' )
 
@@ -42,12 +42,12 @@ if __name__ == '__main__':
 	meta_updater = dict( driver='GTiff', dtype=rasterio.uint8, compress='lzw', crs={'init':'epsg:3338'}, count=1, nodata=None )
 	
 	input_paths = { 
-			'lc01':os.path.join( input_dir, 'NLCD_land_cover_AKNPLCC.tif' ),
-			'cp01':os.path.join( input_dir, 'NLCD_pct_canopy_AKNPLCC.tif' ),
+			'lc01':os.path.join( input_dir, 'nlcd_2001_land_cover_maritime.tif' ),
+			'cp01':os.path.join( input_dir, 'nlcd_2001_canopy_cover_maritime.tif' ),
 			'logged':os.path.join( input_dir, 'AKNPLCC_2ndGrowth.tif' ),
 			'seak_mask':os.path.join( input_dir, 'seak_aoi.tif' ),
 			'scak_mask':os.path.join( input_dir, 'scak_aoi.tif' ),
-			'kodiak_mask':os.path.join( input_dir, 'kodiak_aoi_nlcd.tif' )
+			'kodiak_mask':os.path.join( input_dir, 'kodiak_aoi.tif' )
 	}
 
 	# # open mask arrays
@@ -61,7 +61,7 @@ if __name__ == '__main__':
 		## ## seak reclass ## ##
 		# collapse initial undesired classes to noveg
 		lc_arr = lc.read_band( 1 )
-		lc_arr[ (lc_arr >= 0) & (lc_arr <= 31 ) ] = 1 # potentially 0 later on
+		lc_arr[ (lc_arr >= 0) & (lc_arr <= 31 ) ] = 0 # potentially 0 later on
 
 		# upland forest / fen
 		canopy = rasterio.open( input_paths[ 'cp01' ] ).read_band( 1 )
@@ -75,7 +75,7 @@ if __name__ == '__main__':
 		lc_arr[ (lc_arr >= 41) & (lc_arr <= 95) & (canopy <= 20) & (seak_mask == 1) ] = 12
 		# harvested areas to upland
 		logged = rasterio.open( input_paths[ 'logged' ] ).read_band( 1 )
-		lc_arr[ (logged > 0) & (seak_mask == 1) ] = 10
+		lc_arr[ (logged == 1) & (seak_mask == 1) ] = 10
 
 		## ## scak reclass ## ##
 		# alder
@@ -115,3 +115,4 @@ if __name__ == '__main__':
 		with rasterio.open( output_filename, mode='w', **meta ) as output:
 			output.write_band( 1, lc_arr )
 			# output.write_colormap( 1, ... ) # not implemented yet
+																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																	
