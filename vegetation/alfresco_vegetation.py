@@ -96,7 +96,9 @@ if __name__ == '__main__':
 	gs_value = 6.5
 	input_dir = '/workspace/UA/malindgren/projects/NALCMS_Veg_reClass/August2012_FINALversion/ALFRESCO_VegMap_Ancillary'
 	output_dir = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Output_Data'
+	
 	output_veg = os.path.join( output_dir, 'alfresco_model_vegetation_input_2005.tif' )
+	
 	input_paths = {
 		'lc05':os.path.join( input_dir, 'na_landcover_2005_1km_MASTER.tif'),
 		'north_south':os.path.join( input_dir, 'AKCanada_1km_NorthSouth_FlatWater_999_MASTER.tif'),
