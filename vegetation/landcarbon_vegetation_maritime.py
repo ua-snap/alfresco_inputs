@@ -43,6 +43,31 @@
 #	255 - out of bounds
 # # # # # # # # # # # # # # # 
 
+def hex_to_rgb( hex ):
+	'''
+	borrowed and modified from Matthew Kramer's blog:
+		http://codingsimplicity.com/2012/08/08/python-hex-code-to-rgb-value/
+
+	function to take a hex value and convert it into an RGB(A) representation.
+
+	This is useful for generating color tables for a rasterio GTiff from a QGIS 
+	style file (qml).  Currently tested for the QGIS 2.0+ style version.
+
+	arguments:
+		hex = hex code as a string
+
+	returns:
+		a tuple of (r,g,b,a), where the alpha (a) is ALWAYS 1.  This may need
+		additional work in the future, but is good for the current purpose.
+		** we need to figure out how to calculate that alpha value correctly.
+
+	'''
+	hex = hex.lstrip('#')
+	hlen = len(hex)
+	rgb = [ int( hex[i:i+hlen/3], 16 ) for i in range(0, hlen, hlen/3) ]
+	rgb.insert(len(rgb)+1, 1)
+	return rgb
+
 def qml_to_ctable( qml ):
 	'''
 	take a QGIS style file (.qml) and converts it into a 
@@ -57,7 +82,6 @@ def qml_to_ctable( qml ):
 	import xml.etree.cElementTree as ET
 	tree = ET.ElementTree( file=qml  )
 	return { int( i.get( 'value' ) ) : tuple( hex_to_rgb( i.get('color') ) ) for i in tree.iter( tag='item' ) }
-
 
 if __name__ == '__main__':
 	import os, rasterio, fiona, shutil
@@ -143,11 +167,14 @@ if __name__ == '__main__':
 		# wetland tundra
 		lc_arr[ ( (lc_arr == 72) | (lc_arr == 95) ) & (kodiak_mask == 1) ] = 6
 
+		# set to not modeled any pixels that are outside the aoi masks
+		combined_mask = np.add( seak_mask, scak_mask, kodiak_mask )
+		lc_arr[ combined_mask != 1 ] = 1
+
 		# # write to disk
 		meta = lc.meta
 		meta.update( meta_updater )
 		with rasterio.open( output_filename, mode='w', **meta ) as output:
-			ctable = qml_to_ctable( qml_style )
+			ctable = qml_to_ctable( qml_style ) # rasterio colormap dict r,g,b,a
 			output.write_band( 1, lc_arr )
 			output.write_colormap( 1, ctable )
-			# output.write_colormap( 1, ... ) # not implemented yet
