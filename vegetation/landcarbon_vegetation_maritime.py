@@ -105,7 +105,8 @@ if __name__ == '__main__':
 			'logged':os.path.join( input_dir, 'AKNPLCC_2ndGrowth.tif' ),
 			'seak_mask':os.path.join( input_dir, 'seak_aoi.tif' ),
 			'scak_mask':os.path.join( input_dir, 'scak_aoi.tif' ),
-			'kodiak_mask':os.path.join( input_dir, 'kodiak_aoi.tif' )
+			'kodiak_mask':os.path.join( input_dir, 'kodiak_aoi.tif' ),
+			'combined_mask':os.path.join( input_dir, 'combined_aoi_masks.tif' )
 	}
 
 	# # open mask arrays
@@ -168,7 +169,7 @@ if __name__ == '__main__':
 		lc_arr[ ( (lc_arr == 72) | (lc_arr == 95) ) & (kodiak_mask == 1) ] = 6
 
 		# set to not modeled any pixels that are outside the aoi masks
-		combined_mask = np.add( seak_mask, scak_mask, kodiak_mask )
+		combined_mask = rasterio.open( input_paths[ 'combined_mask' ] ).read_band( 1 )
 		lc_arr[ combined_mask != 1 ] = 1
 
 		# # write to disk
