@@ -43,6 +43,21 @@
 #	255 - out of bounds
 # # # # # # # # # # # # # # # 
 
+def qml_to_ctable( qml ):
+	'''
+	take a QGIS style file (.qml) and converts it into a 
+	rasterio-style GTiff color table for passing into a file.
+
+	arguments:
+		qml = path to a QGIS style file with .qml extension
+	returns:
+		dict of id as key and rgba as the values
+
+	'''
+	import xml.etree.cElementTree as ET
+	tree = ET.ElementTree( file=qml  )
+	return { int( i.get( 'value' ) ) : tuple( hex_to_rgb( i.get('color') ) ) for i in tree.iter( tag='item' ) }
+
 
 if __name__ == '__main__':
 	import os, rasterio, fiona, shutil
@@ -54,6 +69,7 @@ if __name__ == '__main__':
 	version_num = 'v0_4'
 	input_dir = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Input_Data/maritime'
 	output_dir = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Output_Data'
+	qml_style = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Output_Data/qgis_styles/landcarbon_modeled_vegetation_2001_style.qml'
 	output_filename = os.path.join( output_dir, 'landcarbon_vegetation_modelinput_maritime_2001_' + version_num + '.tif' )
 
 	os.chdir( output_dir )
@@ -131,5 +147,7 @@ if __name__ == '__main__':
 		meta = lc.meta
 		meta.update( meta_updater )
 		with rasterio.open( output_filename, mode='w', **meta ) as output:
+			ctable = qml_to_ctable( qml_style )
 			output.write_band( 1, lc_arr )
+			output.write_colormap( 1, ctable )
 			# output.write_colormap( 1, ... ) # not implemented yet
