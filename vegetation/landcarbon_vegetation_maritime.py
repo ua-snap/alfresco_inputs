@@ -26,6 +26,24 @@
 #  ** 16 no veg
 #  ** 17 saltwater
 
+
+# # # OUTPUT LEGEND # # # #
+#
+#	1 - not modeled
+#	2 - white spruce
+#	3 - deciduous
+#	4 - shrub tundra
+#	5 - gramminoid tundra
+#	6 - wetland tundra
+#	7 - heath
+#	8 - upland forest
+#	9 - forested wetland
+#	10 - fen
+#	11 - alder
+#	255 - out of bounds
+# # # # # # # # # # # # # # # 
+
+
 if __name__ == '__main__':
 	import os, rasterio, fiona, shutil
 	from rasterio import features
@@ -65,49 +83,49 @@ if __name__ == '__main__':
 
 		# upland forest / fen
 		canopy = rasterio.open( input_paths[ 'cp01' ] ).read_band( 1 )
-		lc_arr[ (lc_arr == 42) & (canopy > 20) & (seak_mask == 1) ] = 10
-		lc_arr[ (lc_arr == 42) & (canopy <= 20) & (seak_mask == 1) ] = 12
+		lc_arr[ (lc_arr == 42) & (canopy > 20) & (seak_mask == 1) ] = 8 #--#
+		lc_arr[ (lc_arr == 42) & (canopy <= 20) & (seak_mask == 1) ] = 10 #--#
 		# alder / shrubland
-		lc_arr[ (lc_arr == 81) | (lc_arr == 82) & (seak_mask == 1) ] = 15
+		lc_arr[ (lc_arr == 81) | (lc_arr == 82) & (seak_mask == 1) ] = 11 #--#
 
 		# fen / forested wetland
-		lc_arr[ (lc_arr >= 41) & (lc_arr <= 95) & (canopy > 20) & (seak_mask == 1) ] = 11
-		lc_arr[ (lc_arr >= 41) & (lc_arr <= 95) & (canopy <= 20) & (seak_mask == 1) ] = 12
+		lc_arr[ (lc_arr >= 41) & (lc_arr <= 95) & (canopy > 20) & (seak_mask == 1) ] = 9 #--#
+		lc_arr[ (lc_arr >= 41) & (lc_arr <= 95) & (canopy <= 20) & (seak_mask == 1) ] = 10 #--#
 		# harvested areas to upland
 		logged = rasterio.open( input_paths[ 'logged' ] ).read_band( 1 )
-		lc_arr[ (logged == 1) & (seak_mask == 1) ] = 10
+		lc_arr[ (logged == 1) & (seak_mask == 1) ] = 8 #--#
 
 		## ## scak reclass ## ##
 		# alder
-		lc_arr[ (lc_arr == 41) & (scak_mask == 1) ] = 1		
+		lc_arr[ (lc_arr == 41) & (scak_mask == 1) ] = 11 #--#	
 		# white spruce
-		lc_arr[ (lc_arr == 42) & (scak_mask == 1) ] = 2
+		lc_arr[ (lc_arr == 42) & (scak_mask == 1) ] = 2 #--#
 
 		# deciduous
-		lc_arr[ (lc_arr == 43) & (scak_mask == 1) ] = 3
+		lc_arr[ (lc_arr == 43) & (scak_mask == 1) ] = 3 #--#
 		# shrub tundra
-		lc_arr[ ( (lc_arr == 51) | (lc_arr == 52) | (lc_arr == 90) ) & (scak_mask == 1) ] = 4
+		lc_arr[ ( (lc_arr == 51) | (lc_arr == 52) | (lc_arr == 90) ) & (scak_mask == 1) ] = 4 #--#
 
 		# heath
-		lc_arr[ ( (lc_arr == 71) | (lc_arr == 72) ) & (scak_mask == 1) ] = 9
+		lc_arr[ ( (lc_arr == 71) | (lc_arr == 72) ) & (scak_mask == 1) ] = 7 #--#
 		# wetland tundra
-		lc_arr[ (lc_arr == 95) & (scak_mask == 1) ] = 6
+		lc_arr[ (lc_arr == 95) & (scak_mask == 1) ] = 6 #--#
 
 		## ## kodiak reclass ## ##
 		# deciduous
-		lc_arr[ (lc_arr == 41) & (kodiak_mask == 1) ] = 3
+		lc_arr[ (lc_arr == 41) & (kodiak_mask == 1) ] = 3 #--#
 		# upland forest
-		lc_arr[ (lc_arr == 42) & (kodiak_mask == 1) ] = 10
+		lc_arr[ (lc_arr == 42) & (kodiak_mask == 1) ] = 8 #--#
 
 		# shrub tundra
-		lc_arr[ ( (lc_arr == 51) | (lc_arr == 90) ) & (kodiak_mask == 1) ] = 4
+		lc_arr[ ( (lc_arr == 51) | (lc_arr == 90) ) & (kodiak_mask == 1) ] = 4 #--#
 		# alder
-		lc_arr[ (lc_arr == 52) & (kodiak_mask == 1) ] = 15
+		lc_arr[ (lc_arr == 52) & (kodiak_mask == 1) ] = 11 #--#
 
 		# gramminoid tundra
-		lc_arr[ (lc_arr == 71) & (kodiak_mask == 1) ] = 5
+		lc_arr[ (lc_arr == 71) & (kodiak_mask == 1) ] = 5 #--#
 		# wetland tundra
-		lc_arr[ ( (lc_arr == 72) | (lc_arr == 95) ) & (kodiak_mask == 1) ] = 6
+		lc_arr[ ( (lc_arr == 72) | (lc_arr == 95) ) & (kodiak_mask == 1) ] = 6 #--#
 
 		# # write to disk
 		meta = lc.meta
@@ -115,4 +133,3 @@ if __name__ == '__main__':
 		with rasterio.open( output_filename, mode='w', **meta ) as output:
 			output.write_band( 1, lc_arr )
 			# output.write_colormap( 1, ... ) # not implemented yet
-																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																	
