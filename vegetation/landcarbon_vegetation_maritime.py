@@ -97,7 +97,7 @@ if __name__ == '__main__':
 	output_filename = os.path.join( output_dir, 'landcarbon_vegetation_modelinput_maritime_2001_' + version_num + '.tif' )
 
 	os.chdir( output_dir )
-	meta_updater = dict( driver='GTiff', dtype=rasterio.uint8, compress='lzw', crs={'init':'epsg:3338'}, count=1, nodata=None )
+	meta_updater = dict( driver='GTiff', dtype=rasterio.uint8, compress='lzw', crs={'init':'epsg:3338'}, count=1, nodata=255 )
 	
 	input_paths = { 
 			'lc01':os.path.join( input_dir, 'nlcd_2001_land_cover_maritime.tif' ),
@@ -105,8 +105,7 @@ if __name__ == '__main__':
 			'logged':os.path.join( input_dir, 'AKNPLCC_2ndGrowth.tif' ),
 			'seak_mask':os.path.join( input_dir, 'seak_aoi.tif' ),
 			'scak_mask':os.path.join( input_dir, 'scak_aoi.tif' ),
-			'kodiak_mask':os.path.join( input_dir, 'kodiak_aoi.tif' ),
-			'combined_mask':os.path.join( input_dir, 'combined_aoi_masks.tif' )
+			'kodiak_mask':os.path.join( input_dir, 'kodiak_aoi.tif' )
 	}
 
 	# # open mask arrays
@@ -114,13 +113,23 @@ if __name__ == '__main__':
 	seak_mask = rasterio.open( input_paths[ 'seak_mask' ] ).read_band( 1 )
 	kodiak_mask = rasterio.open( input_paths[ 'kodiak_mask' ] ).read_band( 1 )
 
+	# # drop their internal masks
+	scak_mask.fill_value = 0
+	seak_mask.fill_value = 0
+	kodiak_mask.fill_value = 0
+	scak_mask = scak_mask.filled()
+	seak_mask = seak_mask.filled()
+	kodiak_mask = kodiak_mask.filled()
+
 	with rasterio.open( input_paths[ 'lc01' ], mode='r' ) as lc:
 		lc_arr = lc.read_band( 1 )
-		
+		lc_arr.fill_value = 255
+		lc_arr = lc_arr.filled()
+
 		## ## seak reclass ## ##
 		# collapse initial undesired classes to noveg
 		lc_arr = lc.read_band( 1 )
-		lc_arr[ (lc_arr >= 0) & (lc_arr <= 31 ) ] = 0 # potentially 0 later on
+		lc_arr[ (lc_arr >= 0) & (lc_arr <= 31 ) ] = 1 # potentially 0 later on
 
 		# upland forest / fen
 		canopy = rasterio.open( input_paths[ 'cp01' ] ).read_band( 1 )
@@ -134,6 +143,7 @@ if __name__ == '__main__':
 		lc_arr[ (lc_arr >= 41) & (lc_arr <= 95) & (canopy <= 20) & (seak_mask == 1) ] = 10
 		# harvested areas to upland
 		logged = rasterio.open( input_paths[ 'logged' ] ).read_band( 1 )
+		logged = logged.filled()
 		lc_arr[ (logged == 1) & (seak_mask == 1) ] = 8
 
 		## ## scak reclass ## ##
@@ -169,13 +179,16 @@ if __name__ == '__main__':
 		lc_arr[ ( (lc_arr == 72) | (lc_arr == 95) ) & (kodiak_mask == 1) ] = 6
 
 		# set to not modeled any pixels that are outside the aoi masks
-		combined_mask = rasterio.open( input_paths[ 'combined_mask' ] ).read_band( 1 )
-		lc_arr[ combined_mask != 1 ] = 1
+		combined_mask = np.sum( np.dstack( [seak_mask, scak_mask, kodiak_mask] ), axis=2 )
+		combined_mask = combined_mask.astype(np.bool) == False
+
+		lc_arr = lc_arr.filled()
+		lc_arr = np.ma.masked_array( lc_arr, combined_mask, fill_value=255, copy=True )
 
 		# # write to disk
 		meta = lc.meta
 		meta.update( meta_updater )
 		with rasterio.open( output_filename, mode='w', **meta ) as output:
 			ctable = qml_to_ctable( qml_style ) # rasterio colormap dict r,g,b,a
-			output.write_band( 1, lc_arr )
+			output.write_band( 1, lc_arr.filled() )
 			output.write_colormap( 1, ctable )
