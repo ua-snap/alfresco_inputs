@@ -111,7 +111,7 @@ if __name__ == '__main__':
 
 	# collapse classes in the input landcover raster
 	lc = rasterio.open( input_paths[ 'lc05' ] )
-	reclass_list = [[15,20,0],[128,129,0],[1,3,9],[5,7,3],[11,12,4]]
+	reclass_list = [[15,16,0],[17,20,0],[128,129,0],[1,3,9],[5,7,3],[11,12,4]]
 	output_filename = os.path.join( output_dir, 'alfresco_vegetation_step1.tif' )
 	lc_mod = reclassify( lc, reclass_list, output_filename, band=1, creation_options=dict() )
 	lc_mod = lc_mod.read_band( 1 )
@@ -122,6 +122,9 @@ if __name__ == '__main__':
 	coast_spruce_bog.fill_value = 9999
 	lc_mod[ (lc_mod == 14) & (coast_spruce_bog == 2) ] = 9
 	lc_mod[ (lc_mod == 14) & (coast_spruce_bog != 2) ] = 20
+
+	# [TEM] convert Barren to Heath
+	lc_mod[ (lc_mod == 16) ] = 8
 
 	# coastal wetland class to WETLAND TUNDRA or NO VEG based on the gs_temp (Average Growing Season Temperature) values
 	treeline = rasterio.open( input_paths[ 'treeline' ] ).read_band(1).astype( np.int32 )
