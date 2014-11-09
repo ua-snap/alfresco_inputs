@@ -45,6 +45,8 @@ def reclassify( rasterio_rst, reclass_list, output_filename, band=1, creation_op
 
 	with rasterio.open( output_filename, mode='w', **meta ) as out_rst:
 		band_arr = rasterio_rst.read_band( band )
+		band_arr.fill_value = 255 # this is a gotcha
+		band_arr = band_arr.data # this is a gotcha
 		for rcl in reclass_list:
 			band_arr[ np.logical_and( band_arr >= rcl[0], band_arr < rcl[1] ) ] = rcl[2]
 		out_rst.write_band( band, band_arr )
@@ -80,11 +82,10 @@ def replace_erroneous_treeline( lc2d, tl2d ):
 			rows = np.array( [i for i,j in group] )
 			vals = lc2d[ ( rows, cols ) ]
 			vals = vals[ (vals!=1) & (vals!=2) ] # (vals > 0) & 
-			if len(vals) != 0:
+			if len( vals ) != 0:
 				uniques, counts = np.unique( vals, return_counts = True )
 				new_val = uniques[ np.argmax( counts ) ]
-				if new_val not in [1,2]:
-					lc2d[ ind_zip[ count ] ] = new_val
+				lc2d[ ind_zip[ count ] ] = new_val
 		return replace_erroneous_treeline( lc2d, tl2d )
 
 
@@ -94,45 +95,41 @@ if __name__ == '__main__':
 
 	# this should be something passed in at the command line
 	gs_value = 6.5
-	input_dir = '/workspace/UA/malindgren/projects/NALCMS_Veg_reClass/August2012_FINALversion/ALFRESCO_VegMap_Ancillary'
+	input_dir = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Input_Data/alaska_canada'
 	output_dir = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Output_Data'
 	
 	output_veg = os.path.join( output_dir, 'alfresco_model_vegetation_input_2005.tif' )
-	
+	meta_updater = dict( driver='GTiff', dtype=rasterio.uint8, compress='lzw', crs={'init':'epsg:3338'}, count=1, nodata=255 )
+
 	input_paths = {
-		'lc05':os.path.join( input_dir, 'na_landcover_2005_1km_MASTER.tif'),
-		'north_south':os.path.join( input_dir, 'AKCanada_1km_NorthSouth_FlatWater_999_MASTER.tif'),
-		'mask':os.path.join( input_dir, 'mask_for_finalization_alfresco_VegMap.tif'),
-		'gs_temp':os.path.join( input_dir, 'AKCanada_gs_temp_mean_MJJAS_1961_1990_climatology_1km_bilinear_MASTER.tif'),
-		'coast_spruce_bog':os.path.join( input_dir, 'Coastal_vs_Woody_wetlands_MASTER.tif'),
-		'treeline':os.path.join( input_dir, 'CAVM_treeline_AKCanada_1km_commonExtent_MASTER.tif'),
-		'NoPac':os.path.join( input_dir, 'ALFRESCO_NorthPacMaritime_forVegMap.tif')
+		'lc05':os.path.join( input_dir, 'na_landcover_2005_1km.tif' ),
+		'north_south':os.path.join( input_dir, 'alfresco_north_south_flat.tif' ),
+		'mask':os.path.join( input_dir, 'alfresco_vegetation_mask.tif' ),
+		'gs_temp':os.path.join( input_dir, 'alfresco_tas_growingseason_1961_1990.tif' ),
+		'coast_spruce_bog':os.path.join( input_dir, 'alfresco_coastal_interior_domains.tif' ),
+		'treeline':os.path.join( input_dir, 'alfresco_treeline_cavm_derived.tif' ),
+		'NoPac':os.path.join( input_dir, 'alfresco_temperate_rainforest_domain.tif' )
 	}
 
 	# collapse classes in the input landcover raster
 	lc = rasterio.open( input_paths[ 'lc05' ] )
 	reclass_list = [[15,16,0],[17,20,0],[128,129,0],[1,3,9],[5,7,3],[11,12,4]]
 	output_filename = os.path.join( output_dir, 'alfresco_vegetation_step1.tif' )
-	lc_mod = reclassify( lc, reclass_list, output_filename, band=1, creation_options=dict() )
+	lc_mod = reclassify( lc, reclass_list, output_filename, band=1, creation_options={'init':'epsg:3338'} )
 	lc_mod = lc_mod.read_band( 1 )
 	lc_mod.fill_value = 9999
 
 	# convert wetland to spruce bog and wetland
 	coast_spruce_bog = rasterio.open( input_paths[ 'coast_spruce_bog' ] ).read_band( 1 )
-	coast_spruce_bog.fill_value = 9999
 	lc_mod[ (lc_mod == 14) & (coast_spruce_bog == 2) ] = 9
 	lc_mod[ (lc_mod == 14) & (coast_spruce_bog != 2) ] = 20
 
-	# [TEM] convert Barren to Heath
-	lc_mod[ (lc_mod == 16) ] = 8
-
-	# coastal wetland class to WETLAND TUNDRA or NO VEG based on the gs_temp (Average Growing Season Temperature) values
-	treeline = rasterio.open( input_paths[ 'treeline' ] ).read_band(1).astype( np.int32 )
-	gs_temp = rasterio.open( input_paths[ 'gs_temp' ] ).read_band(1)
-	treeline.fill_value = 9999
-	gs_temp.fill_value = 9999.0
+	# coastal wetland class to WETLAND	 TUNDRA or NO VEG based on the gs_temp (Average Growing Season Temperature) values
+	treeline = rasterio.open( input_paths[ 'treeline' ] ).read_band( 1 )
+	gs_temp = rasterio.open( input_paths[ 'gs_temp' ] ).read_band( 1 )
 	lc_mod[ (lc_mod == 20) & (gs_temp < gs_value) & (treeline == 1) ] = 9
-	lc_mod[ (lc_mod == 20) ] = 0
+	lc_mod[ (lc_mod == 20) ] = 6 # [TEM] keep this for tem
+	# lc_mod[ (lc_mod == 20) ] = 0
 
 	# turn the placeholder class 8 (Temperate or sub-polar shrubland) into DECIDUOUS or SHRUB TUNDRA
 	# NOTE: may be best to do the treeline query here for these weird values <- (treeline == 1) etc
@@ -144,29 +141,31 @@ if __name__ == '__main__':
 
 	# Take the SPRUCE placeholder class and parse it out in to WHITE / BLACK.
 	# White Spruce = SPRUCE class & on a South-ish Facing slope
-	north_south = rasterio.open( input_paths[ 'north_south' ] ).read_band(1)
-	north_south.fill_value = 9999
+	north_south = rasterio.open( input_paths[ 'north_south' ] ).read_band( 1 )
 	lc_mod[ (lc_mod == 9) & (north_south == 1) ] = 2
 	lc_mod[ (lc_mod == 9) & (north_south == 2) ] = 1
 	lc_mod[ (lc_mod == 9) ] = 1 # convert low lying spruce leftover to black spruce
 
+	# [TEM] convert Barren to Heath
+	lc_mod[ (lc_mod == 16) ] = 9
+
 	# reclassify erroneous spruce pixels with the most common values of its neighbors
-	lc_mod = replace_erroneous_treeline( lc_mod, treeline )
-	
+	# lc_mod = replace_erroneous_treeline( lc_mod, treeline )
+	lc_mod[ ((lc_mod == 1) | (lc_mod == 2)) & (treeline == 1) ] = 5 # just convert it to gramminoid tundra which is the whole area...
+
 	# temperate rainforest (seak) region delineation
 	temperate_rainforest = rasterio.open( input_paths[ 'NoPac' ] ).read_band( 1 )
-	lc_mod[ (lc_mod > 0) & (temperate_rainforest == 1)  ] = 8
+	lc_mod[ (lc_mod > 0) & (temperate_rainforest == 1) ] = 8
 
 	# conversion of the barren-lichen moss
-	lc_mod[ lc_mod==13 ] = 7
+	lc_mod[ lc_mod == 13 ] = 7
 
 	# convert oob to 255
-	mask = rasterio.open( input_paths[ 'mask' ] ).read_band( 1 )
-	lc_mod[ mask == 1 ] = 255
+	lc_mod.fill_value = 255
 
 	# change the type ( byte ) and write it out
 	meta = lc.meta.copy()
-	meta.update( dtype=rasterio.uint8 )
+	meta.update( meta_updater )
 
 	with rasterio.open( output_veg, 'w', **meta ) as out:
 		out.write_band( 1, lc_mod.astype( rasterio.uint8 ))
