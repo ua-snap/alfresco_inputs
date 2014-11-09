@@ -9,7 +9,7 @@ lc = rasterio.open( '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_dat
 meta = lc.meta
 meta.update( compress='lzw', crs={'init':'epsg:3338'} )
 
-l = glob.glob( '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Input_Data/extents/*.shp' )
+l = glob.glob( '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Input_Data/maritime/shapefile_extents/*.shp' )
 
 shapes = [ [ (j['geometry'], 1) for j in fiona.open(i)] for i in l ]
 
@@ -60,5 +60,17 @@ shapes = [ (j['geometry'], 1) for j in shp ]
 final = features.rasterize(shapes, out_shape=lc.shape, transform=lc.transform, fill=0 )
 with rasterio.open( shp_name.replace('.shp','.tif'), 'w', **meta ) as rst:
 	rst.write_band( 1, final )
+
+# # # MORE STUFF RELATED TO THE MASKING 
+
+os.chdir( '/workspace/Shared/Tech_Projects/AK_LandCarbon/project_data/CODE' )
+from geolib_snap.py import overlay_cover
+
+full_aoi = rasterio.open( '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Input_Data/maritime/nlcd_2001_land_cover_maritime_boolean.tif' ).read_band( 1 )
+seak_aoi = rasterio.open( '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Input_Data/maritime/seak_aoi.tif' ).read_band( 1 )
+
+
+
+overlay_cover( full_aoi, seak_aoi )
 
 
