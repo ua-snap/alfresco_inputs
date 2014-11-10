@@ -162,6 +162,9 @@ if __name__ == '__main__':
 		# wetland tundra
 		lc_arr[ (lc_arr == 95) & (scak_mask == 1) ] = 6
 
+		# leftover 82 (Cultivated Crops) in the scak
+		lc_arr[ (lc_arr == 82) & (scak_mask == 1) ] = 1
+
 		## ## kodiak reclass ## ##
 		# deciduous
 		lc_arr[ (lc_arr == 41) & (kodiak_mask == 1) ] = 3
