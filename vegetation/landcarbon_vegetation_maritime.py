@@ -93,7 +93,7 @@ if __name__ == '__main__':
 	version_num = 'v0_4'
 	input_dir = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Input_Data/maritime'
 	output_dir = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Output_Data'
-	qml_style = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Output_Data/qgis_styles/landcarbon_modeled_vegetation_2001_style.qml'
+	qml_style = os.path.join( output_dir, 'qgis_styles','landcarbon_modeled_vegetation_2001_style.qml' )
 	output_filename = os.path.join( output_dir, 'landcarbon_vegetation_modelinput_maritime_2001_' + version_num + '.tif' )
 
 	os.chdir( output_dir )
