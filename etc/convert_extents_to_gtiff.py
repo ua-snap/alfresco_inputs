@@ -5,9 +5,9 @@
 import glob, os, fiona, rasterio
 from rasterio import features
 
-lc = rasterio.open( '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Input_Data/maritime/nlcd_2001_land_cover_maritime.tif' )
+lc = rasterio.open( '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Input_Data/maritime/new_nlcd/ak_nlcd_2001_land_cover_3-13-08_se5_cropped2_3338.tif' )
 meta = lc.meta
-meta.update( compress='lzw', crs={'init':'epsg:3338'} )
+meta.update( compress='lzw', crs={'init':'epsg:3338'}, nodata=255 )
 
 l = glob.glob( '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Input_Data/maritime/shapefile_extents/*.shp' )
 
@@ -17,7 +17,7 @@ final = [ features.rasterize(i, out_shape=lc.shape, transform=lc.transform, fill
 
 for i,j in zip(final, l):
 	rst = rasterio.open( j.replace('.shp','.tif'), 'w', **meta )
-	rst.write_band(1, i)
+	rst.write_band( 1, i )
 	rst.close()
 
 
