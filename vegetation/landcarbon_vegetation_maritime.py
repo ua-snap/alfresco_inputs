@@ -191,6 +191,7 @@ if __name__ == '__main__':
 		del seak_mask, scak_mask, kodiak_mask
 		combined_mask = combined_mask.astype( np.bool ) == False
 
+		# fill nodata with 255 and set it as a masked array before writing to disk
 		lc_arr = lc_arr.filled()
 		lc_arr = np.ma.masked_array( lc_arr, combined_mask, fill_value=255, copy=True )
 
