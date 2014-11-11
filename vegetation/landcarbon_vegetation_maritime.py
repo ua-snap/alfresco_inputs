@@ -96,6 +96,9 @@ if __name__ == '__main__':
 	qml_style = os.path.join( output_dir, 'qgis_styles','landcarbon_modeled_vegetation_2001_style.qml' )
 	output_filename = os.path.join( output_dir, 'landcarbon_vegetation_modelinput_maritime_2001_' + version_num + '.tif' )
 
+	other_lc = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Input_Data/maritime/new_nlcd/ak_nlcd_2001_land_cover_3-13-08_se5_cropped2_3338.tif'
+	other_cp = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Input_Data/maritime/new_nlcd/ak_nlcd_2001_canopy_cropped_tmp_3338.tif'
+
 	os.chdir( output_dir )
 	meta_updater = dict( driver='GTiff', dtype=rasterio.uint8, compress='lzw', crs={'init':'epsg:3338'}, count=1, nodata=255 )
 	
@@ -121,7 +124,7 @@ if __name__ == '__main__':
 	seak_mask = seak_mask.filled()
 	kodiak_mask = kodiak_mask.filled()
 
-	with rasterio.open( input_paths[ 'lc01' ], mode='r' ) as lc:
+	with rasterio.open( other_lc, mode='r' ) as lc: #input_paths[ 'lc01' ]
 		lc_arr = lc.read_band( 1 )
 		lc_arr.fill_value = 255
 		lc_arr = lc_arr.filled()
@@ -132,7 +135,7 @@ if __name__ == '__main__':
 		lc_arr[ (lc_arr >= 0) & (lc_arr <= 31 ) ] = 1 # potentially 0 later on
 
 		# upland forest / fen
-		canopy = rasterio.open( input_paths[ 'cp01' ] ).read_band( 1 )
+		canopy = rasterio.open( other_cp ).read_band( 1 ) # input_paths[ 'cp01' ]
 		lc_arr[ (lc_arr == 42) & (canopy > 20) & (seak_mask == 1) ] = 8
 		lc_arr[ (lc_arr == 42) & (canopy <= 20) & (seak_mask == 1) ] = 10
 		# alder / shrubland
@@ -195,3 +198,4 @@ if __name__ == '__main__':
 			ctable = qml_to_ctable( qml_style ) # rasterio colormap dict r,g,b,a
 			output.write_band( 1, lc_arr.filled() )
 			output.write_colormap( 1, ctable )
+
