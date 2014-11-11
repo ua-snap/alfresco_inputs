@@ -112,8 +112,8 @@ if __name__ == '__main__':
 	}
 
 	# # open mask arrays
-	scak_mask = rasterio.open( input_paths[ 'scak_mask' ] ).read_band( 1 )
 	seak_mask = rasterio.open( input_paths[ 'seak_mask' ] ).read_band( 1 )
+	scak_mask = rasterio.open( input_paths[ 'scak_mask' ] ).read_band( 1 )
 	kodiak_mask = rasterio.open( input_paths[ 'kodiak_mask' ] ).read_band( 1 )
 
 	# # drop their internal masks
@@ -144,10 +144,12 @@ if __name__ == '__main__':
 		# fen / forested wetland
 		lc_arr[ (lc_arr >= 41) & (lc_arr <= 95) & (canopy > 20) & (seak_mask == 1) ] = 9
 		lc_arr[ (lc_arr >= 41) & (lc_arr <= 95) & (canopy <= 20) & (seak_mask == 1) ] = 10
+		del canopy
 		# harvested areas to upland
 		logged = rasterio.open( input_paths[ 'logged' ] ).read_band( 1 )
 		logged = logged.filled()
 		lc_arr[ (logged == 1) & (seak_mask == 1) ] = 8
+		del logged
 
 		## ## scak reclass ## ##
 		# alder
@@ -186,7 +188,8 @@ if __name__ == '__main__':
 
 		# set to not modeled any pixels that are outside the aoi masks
 		combined_mask = np.sum( np.dstack( [seak_mask, scak_mask, kodiak_mask] ), axis=2 )
-		combined_mask = combined_mask.astype(np.bool) == False
+		del seak_mask, scak_mask, kodiak_mask
+		combined_mask = combined_mask.astype( np.bool ) == False
 
 		lc_arr = lc_arr.filled()
 		lc_arr = np.ma.masked_array( lc_arr, combined_mask, fill_value=255, copy=True )
