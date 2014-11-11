@@ -1,0 +1,104 @@
+# Dev Notes: NEW LEGEND FINAL!
+# ---
+#  Legend: 
+#  0 - NoVeg 
+#  1 - Black Spruce 
+#  2 - White Spruce 
+#  3 - Deciduous 
+#  4 - Shrub Tundra 
+#  5 - Graminoid  Tundra 
+#  6 - Wetland Tundra 
+#  7 - Barren lichen-moss 
+#  8 - Heath
+#  9 - Maritime Upland Forest
+#  10 - Maritime Forested Wetland
+#  11 - Maritime Fen
+#  12 - Martime Alder Shrubland
+#  13 - NoPac Mar
+#  255 - Out-Of-Bounds
+
+
+
+# NALCMS BASE LEGEND:
+# 1      Temperate or sub-polar needleleaf forest  0     0.24  0
+# 2      Sub-polar taiga needleleaf forest         0.58  0.61  0.44
+# 3      Tropical or sub-tropical broadleaf 
+#          evergreen forest                        0     0.39  0
+# 4      Tropical or sub-tropical broadleaf 
+#          deciduous forest                        0.12  0.67  0.02
+# 5      Temperate or sub-polar broadleaf 
+#          deciduous forest                        0.08  0.55  0.24
+# 6      Mixed forest                              0.36  0.46  0.17
+# 7      Tropical or sub-tropical shrubland        0.7   0.62  0.18
+# 8      Temperate or sub-polar shrubland          0.7   0.54  0.2
+# 9      Tropical or sub-tropical grassland        0.91  0.86  0.37
+# 10     Temperate or sub-polar grassland          0.88  0.81  0.54
+# 11     Sub-polar or polar shrubland-lichen-moss  0.61  0.46  0.33
+# 12     Sub-polar or polar grassland-lichen-moss  0.73  0.83  0.56
+# 13     Sub-polar or polar barren-lichen-moss     0.25  0.54  0.45
+# 14     Wetland                                   0.42  0.64  0.54
+# 15     Cropland                                  0.9   0.68  0.4
+# 16     Barren lands                              0.66  0.67  0.68
+# 17     Urban                                     0.86  0.13  0.15
+# 18     Water                                     0.3   0.44  0.64
+# 19     Snow and Ice                              1     0.98  1
+
+
+# All cells in the LandCover_iem_ALFRESCO_2005.tif file that were classed as 0 - No veg, were reset back to the original NALCMS values. 
+# In this new file, cells classified as Cropland, Urban and Built-up, Water, and Snow and Ice were reclassified as 0 - No veg, 
+# cells classified as Wetland were set to Wetland Tundra, and cells classified as Barren Lands were reclassified to Heath.
+
+no_veg = [15, 17, 18, 19] - ok
+wetland_tundra = [14] # * may have to happen at the last step
+heath = [16] - ok
+
+NOTE:
+- there are no WETLAND cells leftover at the end as Yujin claims.  so that step is horsesh-t.
+
+# # # OUTPUT LEGEND # # # #
+#
+#	1 - not modeled
+#	2 - white spruce
+#	3 - deciduous
+#	4 - shrub tundra
+#	5 - gramminoid tundra
+#	6 - wetland tundra
+#	7 - heath
+#	8 - upland forest
+#	9 - forested wetland
+#	10 - fen
+#	11 - alder
+#	255 - out of bounds
+#
+# # # # # # # # # # # # # # # 
+
+
+
+# THE OLD ALFRESCO CLASSIFICATION
+	0 - Not Modeled
+	1 - Black Spruce
+	2 - White Spruce
+	3 - Deciduous
+	4 - Shrub Tundra
+	5 - Graminoid Tundra
+	6 - Wetland Tundra
+	7 - Barren lichen-moss
+	8 - Temperate Rainforest
+	9 - Heath
+	255 - out of bounds
+
+
+AKCan Current Legend:
+
+0 - Not Modeled
+1 - Black Spruce
+2 - White Spruce
+3 - Deciduous
+4 - Shrub Tundra
+5 - Graminoid Tundra
+6 - Wetland Tundra
+7 - Barren lichen-moss
+8 - Temperate Rainforest
+9 - Heath
+255 - out of bounds
+
