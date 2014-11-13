@@ -96,8 +96,8 @@ if __name__ == '__main__':
 	qml_style = os.path.join( output_dir, 'qgis_styles','landcarbon_modeled_vegetation_2001_style.qml' )
 	output_filename = os.path.join( output_dir, 'landcarbon_vegetation_modelinput_maritime_2001_' + version_num + '.tif' )
 
-	other_lc = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Input_Data/maritime/new_nlcd/ak_nlcd_2001_land_cover_3-13-08_se5_cropped2_3338.tif'
-	other_cp = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Input_Data/maritime/new_nlcd/ak_nlcd_2001_canopy_2-7-08_3338.tif'
+	# other_lc = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Input_Data/maritime/new_nlcd/ak_nlcd_2001_land_cover_3-13-08_se5_cropped2_3338.tif'
+	# other_cp = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Input_Data/maritime/new_nlcd/ak_nlcd_2001_canopy_2-7-08_3338.tif'
 
 	os.chdir( output_dir )
 	meta_updater = dict( driver='GTiff', dtype=rasterio.uint8, compress='lzw', crs={'init':'epsg:3338'}, count=1, nodata=255 )

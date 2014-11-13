@@ -1,21 +1,21 @@
 # Dev Notes: NEW LEGEND FINAL!
 # ---
 #  Legend: 
-#  0 - NoVeg 
-#  1 - Black Spruce 
-#  2 - White Spruce 
-#  3 - Deciduous 
-#  4 - Shrub Tundra 
-#  5 - Graminoid  Tundra 
-#  6 - Wetland Tundra 
-#  7 - Barren lichen-moss 
-#  8 - Heath
-#  9 - Maritime Upland Forest
-#  10 - Maritime Forested Wetland
-#  11 - Maritime Fen
-#  12 - Martime Alder Shrubland
-#  13 - NoPac Mar
-#  255 - Out-Of-Bounds
+0 - NoVeg 
+1 - Black Spruce 
+2 - White Spruce 
+3 - Deciduous 
+4 - Shrub Tundra 
+5 - Graminoid  Tundra 
+6 - Wetland Tundra 
+7 - Barren lichen-moss 
+8 - Heath
+9 - Maritime Upland Forest
+10 - Maritime Forested Wetland
+11 - Maritime Fen
+12 - Martime Alder Shrubland
+13 - NoPac Mar
+255 - Out-Of-Bounds
 
 
 
@@ -52,40 +52,38 @@ no_veg = [15, 17, 18, 19] - ok
 wetland_tundra = [14] # * may have to happen at the last step
 heath = [16] - ok
 
-NOTE:
-- there are no WETLAND cells leftover at the end as Yujin claims.  so that step is horsesh-t.
 
 # # # OUTPUT LEGEND # # # #
 #
-#	1 - not modeled
-#	2 - white spruce
-#	3 - deciduous
-#	4 - shrub tundra
-#	5 - gramminoid tundra
-#	6 - wetland tundra
-#	7 - heath
-#	8 - upland forest
-#	9 - forested wetland
-#	10 - fen
-#	11 - alder
-#	255 - out of bounds
-#
+1 - not modeled
+2 - white spruce
+3 - deciduous
+4 - shrub tundra
+5 - gramminoid tundra
+6 - wetland tundra
+7 - heath
+8 - upland forest
+9 - forested wetland
+10 - fen
+11 - alder
+255 - out of bounds
+
 # # # # # # # # # # # # # # # 
 
 
 
 # THE OLD ALFRESCO CLASSIFICATION
-	0 - Not Modeled
-	1 - Black Spruce
-	2 - White Spruce
-	3 - Deciduous
-	4 - Shrub Tundra
-	5 - Graminoid Tundra
-	6 - Wetland Tundra
-	7 - Barren lichen-moss
-	8 - Temperate Rainforest
-	9 - Heath
-	255 - out of bounds
+0 - Not Modeled
+1 - Black Spruce
+2 - White Spruce
+3 - Deciduous
+4 - Shrub Tundra
+5 - Graminoid Tundra
+6 - Wetland Tundra
+7 - Barren lichen-moss
+8 - Temperate Rainforest
+9 - Heath
+255 - out of bounds
 
 
 AKCan Current Legend:
