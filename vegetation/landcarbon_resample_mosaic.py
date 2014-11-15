@@ -102,7 +102,6 @@ def hex_to_rgb( hex ):
 	rgb = [ int( hex[i:i+hlen/3], 16 ) for i in range(0, hlen, hlen/3) ]
 	rgb.insert(len(rgb)+1, 1)
 	return rgb
-
 def qml_to_ctable( qml ):
 	'''
 	take a QGIS style file (.qml) and converts it into a 

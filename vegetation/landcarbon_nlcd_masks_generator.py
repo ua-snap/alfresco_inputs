@@ -1,4 +1,4 @@
-import rasterio, os, shutil
+import rasterio, os, shutil, glob
 import numpy as np
 
 ###
@@ -69,3 +69,47 @@ if os.path.exists( output_resampled ):
 shutil.copyfile( template, output_resampled )
 command = 'gdalwarp -r mode -multi -srcnodata None ' + new_mask + ' ' + output_resampled
 os.system( command )
+
+
+## Now lets take the domain rasters for SEAK, SCAK and remove Canada 
+ak_only_combined = rasterio.open( '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Input_Data/maritime/combined_mask_alaska_only.tif' )
+seak = rasterio.open( '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Input_Data/maritime/seak_aoi.tif' )
+scak = rasterio.open( '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Input_Data/maritime/scak_aoi.tif' )
+kodiak = rasterio.open( '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Input_Data/maritime/kodiak_aoi.tif' )
+# some file meta for the output rasters
+meta = ak_only_combined.meta
+meta.update( compress='lzw', nodata=None )
+
+ak_arr = ak_only_combined.read_band( 1 )
+
+# seak 
+seak_arr = seak.read_band( 1 )
+out_arr = np.zeros_like( seak_arr.data )
+
+out_arr[ (ak_arr == 1) & (seak_arr == 1) ] = 1
+
+output_filename = seak.name.replace( '.tif', '_akonly.tif' )
+with rasterio.open( output_filename, 'w', **meta  ) as out:
+	out.write_band( 1, out_arr )
+
+del seak_arr, seak
+
+# scak 
+scak_arr = scak.read_band( 1 )
+out_arr = np.zeros_like( scak_arr.data )
+
+out_arr[ (ak_arr == 1) & (scak_arr == 1) ] = 1
+
+output_filename = scak.name.replace( '.tif', '_akonly.tif' )
+with rasterio.open( output_filename, 'w', **meta  ) as out:
+	out.write_band( 1, out_arr )
+
+del scak_arr, scak
+
+# kodiak
+kodiak_arr = kodiak.read_band( 1 ).filled()
+output_filename = kodiak.name.replace( '.tif', '_akonly.tif' )
+with rasterio.open( output_filename, 'w', **meta  ) as out:
+    out.write_band( 1, kodiak_arr.filled() )
+
+del kodiak_arr, kodiak
