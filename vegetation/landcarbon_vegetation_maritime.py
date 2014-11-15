@@ -96,9 +96,6 @@ if __name__ == '__main__':
 	qml_style = os.path.join( output_dir, 'qgis_styles','landcarbon_modeled_vegetation_2001_style.qml' )
 	output_filename = os.path.join( output_dir, 'landcarbon_vegetation_modelinput_maritime_2001_' + version_num + '.tif' )
 
-	# other_lc = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Input_Data/maritime/new_nlcd/ak_nlcd_2001_land_cover_3-13-08_se5_cropped2_3338.tif'
-	# other_cp = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Input_Data/maritime/new_nlcd/ak_nlcd_2001_canopy_2-7-08_3338.tif'
-
 	os.chdir( output_dir )
 	meta_updater = dict( driver='GTiff', dtype=rasterio.uint8, compress='lzw', crs={'init':'epsg:3338'}, count=1, nodata=255 )
 	
@@ -106,9 +103,9 @@ if __name__ == '__main__':
 			'lc01':os.path.join( input_dir, 'nlcd_2001_land_cover_maritime.tif' ),
 			'cp01':os.path.join( input_dir, 'nlcd_2001_canopy_cover_maritime.tif' ),
 			'logged':os.path.join( input_dir, 'AKNPLCC_2ndGrowth.tif' ),
-			'seak_mask':os.path.join( input_dir, 'seak_aoi.tif' ),
-			'scak_mask':os.path.join( input_dir, 'scak_aoi.tif' ),
-			'kodiak_mask':os.path.join( input_dir, 'kodiak_aoi.tif' )
+			'seak_mask':os.path.join( input_dir, 'seak_aoi_akonly.tif' ),
+			'scak_mask':os.path.join( input_dir, 'scak_aoi_akonly.tif' ),
+			'kodiak_mask':os.path.join( input_dir, 'kodiak_aoi_akonly.tif' )
 	}
 
 	# # open mask arrays
@@ -116,15 +113,7 @@ if __name__ == '__main__':
 	scak_mask = rasterio.open( input_paths[ 'scak_mask' ] ).read_band( 1 )
 	kodiak_mask = rasterio.open( input_paths[ 'kodiak_mask' ] ).read_band( 1 )
 
-	# # drop their internal masks
-	scak_mask.fill_value = 0
-	seak_mask.fill_value = 0
-	kodiak_mask.fill_value = 0
-	scak_mask = scak_mask.filled()
-	seak_mask = seak_mask.filled()
-	kodiak_mask = kodiak_mask.filled()
-
-	with rasterio.open( other_lc, mode='r' ) as lc: #input_paths[ 'lc01' ]
+	with rasterio.open( input_paths[ 'lc01' ], mode='r' ) as lc:
 		lc_arr = lc.read_band( 1 )
 		lc_arr.fill_value = 255
 		lc_arr = lc_arr.filled()
@@ -135,7 +124,7 @@ if __name__ == '__main__':
 		lc_arr[ (lc_arr >= 0) & (lc_arr <= 31 ) ] = 1 # potentially 0 later on
 
 		# upland forest / fen
-		canopy = rasterio.open( other_cp ).read_band( 1 ) # input_paths[ 'cp01' ]
+		canopy = rasterio.open( input_paths[ 'cp01' ] ).read_band( 1 )
 		lc_arr[ (lc_arr == 42) & (canopy > 20) & (seak_mask == 1) ] = 8
 		lc_arr[ (lc_arr == 42) & (canopy <= 20) & (seak_mask == 1) ] = 10
 		# alder / shrubland
