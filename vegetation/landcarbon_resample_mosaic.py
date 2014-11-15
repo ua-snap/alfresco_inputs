@@ -137,11 +137,10 @@ if __name__ == '__main__':
 		del arr
 
 	# use gdalwarp to reproject and resample to the full akcanada domain
-	command = 'gdalwarp -r mode ' + input_filename + ' ' + output_resampled
+	command = 'gdalwarp -r mode -multi -srcnodata None ' + input_filename + ' ' + output_resampled
 	# command = 'gdalwarp -te -1725223.2058074852 321412.93264415674 3802776.794192515 2544412.9326441567 -tr 1000 1000 -tap -r mode -srcnodata 255 -dstnodata 255 -multi -co "COMPRESS=LZW" ' + \
 	# 			input_filename + ' ' + output_resampled
 	os.system( command )
-
 
 	# now do the same thing with the combined maritime mask
 	output_resampled = os.path.join( input_dir, 'landcarbon_vegetation_modelinput_maritime_mask_1km.tif' )
@@ -154,11 +153,8 @@ if __name__ == '__main__':
 		del arr
 
 	combined_mask = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Input_Data/maritime/combined_mask.tif'
-	command = 'gdalwarp -r mode ' + combined_mask + ' ' + output_resampled
+	command = 'gdalwarp -r mode  -multi -srcnodata None ' + combined_mask + ' ' + output_resampled
 	os.system( command )
-
-
-
 
 	maritime = rasterio.open( output_resampled )
 	alfresco = rasterio.open( os.path.join( input_dir, 'alfresco_model_vegetation_input_2005.tif' ) )
@@ -206,9 +202,7 @@ if __name__ == '__main__':
 		maritime_arr = maritime_rcl.read_band( 1 )
 		maritime_mask = ( maritime_arr.data > 0 ).astype( np.uint8 )
 		akcan_arr = alfresco_rcl.read_band( 1 )
-		# combined_mask_arr = combined_mask.read_band( 1 )
 		# pass in values over the collective domain
-		# ind = np.where((akcan_arr == 13) & ( (maritime_arr != 255) | (maritime_arr != 0) ) )
 		ind = np.where( (akcan_arr == 13) & (maritime_arr > 0) ) #  (akcan_arr == 13) & 
 		akcan_arr[ ind ] = maritime_arr[ ind ]
 		out.write_band( 1, akcan_arr )
