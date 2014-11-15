@@ -78,24 +78,88 @@ def bounds_to_window( geotransform, rasterio_bounds ):
 	ur = rasterio_bounds[2:]
 	ll_xy, ur_xy = [ world2Pixel( geotransform, x, y ) for x, y in [ll, ur] ]
 	return (( ur_xy[1], ll_xy[1]), ( ll_xy[0], ur_xy[0]))
+def hex_to_rgb( hex ):
+	'''
+	borrowed and modified from Matthew Kramer's blog:
+		http://codingsimplicity.com/2012/08/08/python-hex-code-to-rgb-value/
 
+	function to take a hex value and convert it into an RGB(A) representation.
+
+	This is useful for generating color tables for a rasterio GTiff from a QGIS 
+	style file (qml).  Currently tested for the QGIS 2.0+ style version.
+
+	arguments:
+		hex = hex code as a string
+
+	returns:
+		a tuple of (r,g,b,a), where the alpha (a) is ALWAYS 1.  This may need
+		additional work in the future, but is good for the current purpose.
+		** we need to figure out how to calculate that alpha value correctly.
+
+	'''
+	hex = hex.lstrip('#')
+	hlen = len(hex)
+	rgb = [ int( hex[i:i+hlen/3], 16 ) for i in range(0, hlen, hlen/3) ]
+	rgb.insert(len(rgb)+1, 1)
+	return rgb
+
+def qml_to_ctable( qml ):
+	'''
+	take a QGIS style file (.qml) and converts it into a 
+	rasterio-style GTiff color table for passing into a file.
+
+	arguments:
+		qml = path to a QGIS style file with .qml extension
+	returns:
+		dict of id as key and rgba as the values
+
+	'''
+	import xml.etree.cElementTree as ET
+	tree = ET.ElementTree( file=qml  )
+	return { int( i.get( 'value' ) ) : tuple( hex_to_rgb( i.get('color') ) ) for i in tree.iter( tag='item' ) }
 
 if __name__ == '__main__':
-	import os, rasterio, fiona
+	import os, rasterio, fiona, shutil, glob
 	import numpy as np
 
 	input_dir = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Output_Data'
 	input_filename = os.path.join( input_dir, 'landcarbon_vegetation_modelinput_maritime_2001_v0_4.tif' )
 	output_resampled = os.path.join( input_dir, 'landcarbon_vegetation_modelinput_maritime_2001_v0_4_1km.tif' )
 
-	# if os.path.exists( output_resampled ):
-	# 	os.remove( output_resampled )
+	if os.path.exists( output_resampled ):
+		[ os.remove( i ) for i in glob.glob( output_resampled[:-3] + '*' ) ]
 
-	output_resampled = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Input_Data/alaska_canada/alfresco_vegetation_mask_landcarbon.tif'
+	shutil.copy( os.path.join( input_dir, 'alfresco_model_vegetation_input_2005.tif' ), output_resampled )
+	maritime = rasterio.open( output_resampled ) # something odd here but this hack works -- does nothing
+	with rasterio.open( output_resampled, 'r+' ) as maritime:
+		arr = maritime.read_band( 1 ).data
+		arr[:] = 0
+		maritime.write_band( 1, arr )
+		del arr
 
-	# use gdalwarp to reproject 
-	# command = 'gdalwarp -tr 1000 1000 -r mode -srcnodata None -dstnodata None -multi -co "COMPRESS=LZW" '+ input_filename + ' ' + output_resampled
-	# os.system( command )
+	# use gdalwarp to reproject and resample to the full akcanada domain
+	command = 'gdalwarp -r mode ' + input_filename + ' ' + output_resampled
+	# command = 'gdalwarp -te -1725223.2058074852 321412.93264415674 3802776.794192515 2544412.9326441567 -tr 1000 1000 -tap -r mode -srcnodata 255 -dstnodata 255 -multi -co "COMPRESS=LZW" ' + \
+	# 			input_filename + ' ' + output_resampled
+	os.system( command )
+
+
+	# now do the same thing with the combined maritime mask
+	output_resampled = os.path.join( input_dir, 'landcarbon_vegetation_modelinput_maritime_mask_1km.tif' )
+	shutil.copy( '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Input_Data/alaska_canada/alfresco_vegetation_mask.tif' , output_resampled )
+	maritime_mask = rasterio.open( output_resampled ) # something odd here but this hack works -- does nothing
+	with rasterio.open( output_resampled, 'r+' ) as maritime_mask:
+		arr = maritime_mask.read_band( 1 ).data
+		arr[:] = 0
+		maritime_mask.write_band( 1, arr )
+		del arr
+
+	combined_mask = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Input_Data/maritime/combined_mask.tif'
+	command = 'gdalwarp -r mode ' + combined_mask + ' ' + output_resampled
+	os.system( command )
+
+
+
 
 	maritime = rasterio.open( output_resampled )
 	alfresco = rasterio.open( os.path.join( input_dir, 'alfresco_model_vegetation_input_2005.tif' ) )
@@ -103,8 +167,8 @@ if __name__ == '__main__':
 	# reclassify martime to a common classification
 	output_filename = output_resampled.replace( '.tif', '_iem_rcl.tif' )
 	reclass_list = [[11, 12, 12], [10, 11, 11], [9, 10, 10], [8, 9, 9], [7, 8, 8], [1, 2, 0]]
-	# [[1,2,0],[7,8,8],[8,9,9],[9,10,10],[10,11,11],[11,12,12]]
 	maritime_rcl = reclassify( maritime, reclass_list, output_filename, band=1, creation_options={'compress':'lzw'} )
+	maritime_rcl.close()
 
 	# reclassify alfresco veg to a common classification
 	output_filename = alfresco.name.replace( '.tif', '_iem_rcl.tif' )
@@ -112,43 +176,44 @@ if __name__ == '__main__':
 	alfresco_rcl = reclassify( alfresco, reclass_list, output_filename, band=1, creation_options={'compress':'lzw'} )
 	alfresco_rcl.close()
 
-	# block out kodiak here.
-	kodiak_mask_nalcms = rasterio.open( '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Input_Data/maritime/shapefile_extents/kodiak_aoi_mask_nalcms.tif' )
-	kodiak_shape_mask_nalcms = fiona.open( '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Input_Data/maritime/shapefile_extents/kodiak_aoi_mask_nalcms.shp' )
+	# mask out the NALCMS Kodiak Extent
+	alfresco_rcl = rasterio.open( output_filename )
+	meta = alfresco_rcl.meta
+	meta.update( compress='lzw', nodata=255 )
+	kodiak_mask_nalcms = rasterio.open( '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Output_Data/alfresco_vegetation_kodiak_mask.tif' )
 	output_filename = os.path.join( input_dir, 'mosaic_step1_mask_kodiak.tif' )
-	'gdal_merge.py -o ' + output_filename + '-of GTiff -co "COMPRESS=LZW" -tap -v -init 255 -n 255 ' + alfresco_rcl.name + ' ' + kodiak_mask_nalcms.name
+	with rasterio.open( output_filename , 'w', **meta ) as out:
+		alfresco_rcl_arr = alfresco_rcl.read_band( 1 )
+		kodiak_mask_arr = kodiak_mask_nalcms.read_band( 1 )
+		alfresco_rcl_arr[ kodiak_mask_arr == 1 ] = 255
+		out.write_band( 1, alfresco_rcl_arr )
+
+	del maritime, alfresco
 
 	alfresco_rcl = rasterio.open( output_filename ) # read it back in after masking
+	maritime_rcl = rasterio.open( maritime_rcl.name )
+	
+	# generate an output colortable to pass to the new raster
+	# qml = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Output_Data/qgis_styles/IEM_LandCarbon_Vegetation_QGIS_STYLE_v1_0.qml'
+	qml = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Output_Data/qgis_styles/iem_vegetation_modelinput_qgis_style.qml'
+	cmap = qml_to_ctable( qml )
 
 	# extend the extent of the martime data to match the extent of the alfresco data
 	# overlay 2 maps and fill-in where North Pacific Maritime (class 13)
-	window = bounds_to_window( alfresco_rcl.transform, maritime_rcl.bounds )
 	meta = alfresco_rcl.meta
 	meta.update( compress='lzw', nodata=255 )
 	output_filename = os.path.join( input_dir, 'iem_model_vegetation_input_merged.tif' )
 	with rasterio.open( output_filename, 'w', **meta ) as out:
 		maritime_arr = maritime_rcl.read_band( 1 )
-		akcan_arr = alfresco_rcl.read_band( 1, window=window )
-		# akcan_arr[ (akcan_arr == 13) & (maritime_arr != 255) ] = maritime_arr
-		np.place( akcan_arr, akcan_arr == 13, maritime_arr.ravel() )
-		out.write_band( 1, akcan_arr, window=window )
-		# extract kodiak from the maritime to pass into the new map
-		window_kodiak = bounds_to_window( alfresco_rcl.transform, kodiak_shape_mask_nalcms.bounds )
-		kodiak_arr = maritime_rcl.read_band( 1, window=window_kodiak )
-		out.write_band( 1, kodiak_arr, window=window )
-
-
-
-
-
-
-
-	# use polygon to convert Canada North Pacific Maritime to Upland Fores
-
-	# use a polygon to set all other North Pacific Maritime to Out-of-bounds
-
-	# pass in a colortable and write out
-
+		maritime_mask = ( maritime_arr.data > 0 ).astype( np.uint8 )
+		akcan_arr = alfresco_rcl.read_band( 1 )
+		# combined_mask_arr = combined_mask.read_band( 1 )
+		# pass in values over the collective domain
+		# ind = np.where((akcan_arr == 13) & ( (maritime_arr != 255) | (maritime_arr != 0) ) )
+		ind = np.where( (akcan_arr == 13) & (maritime_arr > 0) ) #  (akcan_arr == 13) & 
+		akcan_arr[ ind ] = maritime_arr[ ind ]
+		out.write_band( 1, akcan_arr )
+		out.write_colormap( 1, cmap )
 
 
 
@@ -161,3 +226,4 @@ if __name__ == '__main__':
 # no_veg = [15, 17, 18, 19]
 # wetland_tundra = [14] 
 # heath = [16]
+
