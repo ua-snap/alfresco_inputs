@@ -138,8 +138,6 @@ if __name__ == '__main__':
 
 	# use gdalwarp to reproject and resample to the full akcanada domain
 	command = 'gdalwarp -r mode -multi -srcnodata None ' + input_filename + ' ' + output_resampled
-	# command = 'gdalwarp -te -1725223.2058074852 321412.93264415674 3802776.794192515 2544412.9326441567 -tr 1000 1000 -tap -r mode -srcnodata 255 -dstnodata 255 -multi -co "COMPRESS=LZW" ' + \
-	# 			input_filename + ' ' + output_resampled
 	os.system( command )
 
 	# now do the same thing with the combined maritime mask
@@ -189,7 +187,6 @@ if __name__ == '__main__':
 	maritime_rcl = rasterio.open( maritime_rcl.name )
 	
 	# generate an output colortable to pass to the new raster
-	# qml = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Output_Data/qgis_styles/IEM_LandCarbon_Vegetation_QGIS_STYLE_v1_0.qml'
 	qml = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Output_Data/qgis_styles/iem_vegetation_modelinput_qgis_style.qml'
 	cmap = qml_to_ctable( qml )
 
