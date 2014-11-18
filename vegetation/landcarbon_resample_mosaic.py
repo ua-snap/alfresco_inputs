@@ -125,37 +125,40 @@ if __name__ == '__main__':
 	input_filename = os.path.join( input_dir, 'landcarbon_vegetation_modelinput_maritime_2001_v0_4.tif' )
 	output_resampled = os.path.join( input_dir, 'landcarbon_vegetation_modelinput_maritime_2001_v0_4_1km.tif' )
 
-	if os.path.exists( output_resampled ):
-		[ os.remove( i ) for i in glob.glob( output_resampled[:-3] + '*' ) ]
+		# if os.path.exists( output_resampled ):
+		# 	[ os.remove( i ) for i in glob.glob( output_resampled[:-3] + '*' ) ]
 
-	shutil.copy( os.path.join( input_dir, 'alfresco_model_vegetation_input_2005.tif' ), output_resampled )
-	maritime = rasterio.open( output_resampled ) # something odd here but this hack works -- does nothing
-	with rasterio.open( output_resampled, 'r+' ) as maritime:
-		arr = maritime.read_band( 1 ).data
-		arr[:] = 0
-		maritime.write_band( 1, arr )
-		del arr
+		# shutil.copy( os.path.join( input_dir, 'alfresco_model_vegetation_input_2005.tif' ), output_resampled )
+		# maritime = rasterio.open( output_resampled ) # something odd here but this hack works -- does nothing
+		# with rasterio.open( output_resampled, 'r+' ) as maritime:
+		# 	arr = maritime.read_band( 1 ).data
+		# 	arr[:] = 0
+		# 	maritime.write_band( 1, arr )
+		# 	del arr
 
-	# use gdalwarp to reproject and resample to the full akcanada domain
-	command = 'gdalwarp -r mode -multi -srcnodata None ' + input_filename + ' ' + output_resampled
-	os.system( command )
+		# # use gdalwarp to reproject and resample to the full akcanada domain
+		# command = 'gdalwarp -r mode -multi -srcnodata None ' + input_filename + ' ' + output_resampled
+		# os.system( command )
 
-	# now do the same thing with the combined maritime mask
-	output_resampled = os.path.join( input_dir, 'landcarbon_vegetation_modelinput_maritime_mask_1km.tif' )
-	shutil.copy( '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Input_Data/alaska_canada/alfresco_vegetation_mask.tif' , output_resampled )
-	maritime_mask = rasterio.open( output_resampled ) # something odd here but this hack works -- does nothing
-	with rasterio.open( output_resampled, 'r+' ) as maritime_mask:
-		arr = maritime_mask.read_band( 1 ).data
-		arr[:] = 0
-		maritime_mask.write_band( 1, arr )
-		del arr
 
-	combined_mask = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Input_Data/maritime/combined_mask.tif'
-	command = 'gdalwarp -r mode  -multi -srcnodata None ' + combined_mask + ' ' + output_resampled
-	os.system( command )
+
+	# # now do the same thing with the combined maritime mask
+	# output_resampled = os.path.join( input_dir, 'landcarbon_vegetation_modelinput_maritime_mask_1km.tif' )
+	# shutil.copy( '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Input_Data/alaska_canada/alfresco_vegetation_mask.tif' , output_resampled )
+	# maritime_mask = rasterio.open( output_resampled ) # something odd here but this hack works -- does nothing
+	# with rasterio.open( output_resampled, 'r+' ) as maritime_mask:
+	# 	arr = maritime_mask.read_band( 1 ).data
+	# 	arr[:] = 0
+	# 	maritime_mask.write_band( 1, arr )
+	# 	del arr
+
+	# combined_mask = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Input_Data/maritime/combined_mask.tif'
+	# command = 'gdalwarp -r mode  -multi -srcnodata None ' + combined_mask + ' ' + output_resampled
+	# os.system( command )
 
 	maritime = rasterio.open( output_resampled )
 	alfresco = rasterio.open( os.path.join( input_dir, 'alfresco_model_vegetation_input_2005.tif' ) )
+	# maritime_mask = rasterio.open( maritime_mask )
 
 	# reclassify martime to a common classification
 	output_filename = output_resampled.replace( '.tif', '_iem_rcl.tif' )
@@ -190,18 +193,39 @@ if __name__ == '__main__':
 	qml = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Output_Data/qgis_styles/iem_vegetation_modelinput_qgis_style.qml'
 	cmap = qml_to_ctable( qml )
 
+	maritime_mask_1k = rasterio.open( '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Input_Data/maritime/combined_mask_alaska_only_akcan_1km.tif' )
+	# nlcd_mask_1k = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Input_Data/maritime/nlcd_2001_land_cover_maritime_mask_akcan_1km.tif'
+	nlcd_saltwater_mask = rasterio.open( '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Input_Data/maritime/nlcd_2001_land_cover_maritime_saltwater_mask_akcan_1km.tif' )
+	maritime_mask_canada = rasterio.open( '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Input_Data/maritime/combined_mask_canada_only_akcan_1km.tif' )
+	temperate_rf_mask = rasterio.open( '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Input_Data/maritime/digitized_removal_mask_temperate_rainforest_maritime.tif' )
+	iem_mask = rasterio.open( '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Input_Data/maritime/iem_mask_1km_akcan.tif' )
+
 	# extend the extent of the martime data to match the extent of the alfresco data
 	# overlay 2 maps and fill-in where North Pacific Maritime (class 13)
 	meta = alfresco_rcl.meta
 	meta.update( compress='lzw', nodata=255 )
 	output_filename = os.path.join( input_dir, 'iem_model_vegetation_input_merged.tif' )
 	with rasterio.open( output_filename, 'w', **meta ) as out:
-		maritime_arr = maritime_rcl.read_band( 1 )
-		maritime_mask = ( maritime_arr.data > 0 ).astype( np.uint8 )
-		akcan_arr = alfresco_rcl.read_band( 1 )
+		maritime_arr = maritime_rcl.read_band( 1 ).data
+		maritime_mask = maritime_mask_1k.read_band(1) # ( maritime_arr.data > 0 ).astype( np.uint8 )
+		maritime_mask_can_arr = maritime_mask_canada.read_band( 1 )
+		akcan_arr = alfresco_rcl.read_band( 1 ).data
+		nlcd_sw_arr = nlcd_saltwater_mask.read_band( 1 )
+		temperate_rf_mask_arr = temperate_rf_mask.read_band( 1 )
+		iem_mask_arr = iem_mask.read_band( 1 )
+
 		# pass in values over the collective domain
-		ind = np.where( (akcan_arr == 13) & (maritime_arr > 0) ) #  (akcan_arr == 13) & 
+		ind = np.where( maritime_mask == 1 ) #  (akcan_arr == 13) & 
 		akcan_arr[ ind ] = maritime_arr[ ind ]
+		# remove the Canadian IEM domain Temperate Rainforest and convert to Maritime Upland Forest
+		akcan_arr[ (maritime_mask_can_arr == 1) & (akcan_arr == 13) ] = 9
+		# remove the rest of the errant Temperate Rainforest and convert to no veg
+		akcan_arr[ (nlcd_sw_arr == 1) & (akcan_arr == 13) ] = 0
+		akcan_arr[ (temperate_rf_mask_arr == 1) & (akcan_arr == 13) ] = 0
+		
+		# anything left on the canada side convert to Maritime Upland Forest
+		akcan_arr[ (iem_mask_arr == 1) & (akcan_arr == 13) ] = 9
+		
 		out.write_band( 1, akcan_arr )
 		out.write_colormap( 1, cmap )
 

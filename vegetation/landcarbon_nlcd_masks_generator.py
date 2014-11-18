@@ -113,3 +113,26 @@ with rasterio.open( output_filename, 'w', **meta  ) as out:
     out.write_band( 1, kodiak_arr.filled() )
 
 del kodiak_arr, kodiak
+
+
+# # make a mask of the saltwater domain from NLCD -- class 11
+nlcd = rasterio.open( '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Input_Data/maritime/nlcd_2001_land_cover_maritime.tif' )
+meta = nlcd.meta
+meta.update( compress='lzw', nodata=None )
+arr = nlcd.read_band( 1 ).data
+arr[ arr != 11 ] = 0
+arr[ arr == 11 ] = 1
+
+output_filename = nlcd.name.replace( '.tif', '_saltwater_mask.tif' )
+with rasterio.open( output_filename, 'w', **meta ) as out:
+	out.write_band( 1, arr )
+
+
+# make a 1km version in the domain of the large AKCanada Extent
+output_resampled = out.name.replace( '.tif', '_akcan_1km.tif' )
+if os.path.exists( output_resampled ):
+	[ os.remove( i ) for i in glob.glob( output_resampled[:-3] + '*' ) ]
+
+shutil.copyfile( template, output_resampled )
+command = 'gdalwarp -r mode -multi -srcnodata None ' + out.name + ' ' + output_resampled
+os.system( command )
