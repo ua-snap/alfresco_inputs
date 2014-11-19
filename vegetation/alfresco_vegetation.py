@@ -52,43 +52,6 @@ def reclassify( rasterio_rst, reclass_list, output_filename, band=1, creation_op
 		out_rst.write_band( band, band_arr )
 	return rasterio.open( output_filename )
 
-def replace_erroneous_treeline( lc2d, tl2d ):
-	''' replace values based on neighbors of offenders and a where condition 
-		arguments:
-			lc2d = 2d landcover array with erroneous values within
-			tl2d = 2d treeline boolean array to subset the landcover array
-		returns:
-			2d numpy array with the erroneous values removed
-
-	'''
-	ind = np.where( (((lc2d == 1) | (lc2d == 2)) & (tl2d == 1)) ) # this is hardwired...
-	ind_zip = zip( *ind )
-	print len( ind_zip )
-	if len( ind_zip ) == 0:
-		return lc2d
-	else:
-		index_groups = [ [(i-1,j-1), 
-						  (i-1, j+0), 
-						  (i-1,j+1), 
-						  (i+0,j-1), 
-						  (i+0,j+1), 
-						  (i+1,j-1), 
-						  (i+1,j+0), 
-						  (i+1,j+1)]
-						for i,j in ind_zip ]
-		
-		for count, group in enumerate( index_groups ):
-			cols = np.array( [j for i,j in group] )
-			rows = np.array( [i for i,j in group] )
-			vals = lc2d[ ( rows, cols ) ]
-			vals = vals[ (vals!=1) & (vals!=2) ] # (vals > 0) & 
-			if len( vals ) != 0:
-				uniques, counts = np.unique( vals, return_counts = True )
-				new_val = uniques[ np.argmax( counts ) ]
-				lc2d[ ind_zip[ count ] ] = new_val
-		return replace_erroneous_treeline( lc2d, tl2d )
-
-
 if __name__ == '__main__':
 	import rasterio, fiona, os, sys
 	import numpy as np
@@ -124,12 +87,14 @@ if __name__ == '__main__':
 	lc_mod[ (lc_mod == 14) & (coast_spruce_bog == 2) ] = 9
 	lc_mod[ (lc_mod == 14) & (coast_spruce_bog != 2) ] = 20
 
-	# coastal wetland class to WETLAND	 TUNDRA or NO VEG based on the gs_temp (Average Growing Season Temperature) values
+	# coastal wetland class to WETLAND TUNDRA or NO VEG based on the gs_temp (Average Growing Season Temperature) values
 	treeline = rasterio.open( input_paths[ 'treeline' ] ).read_band( 1 )
 	gs_temp = rasterio.open( input_paths[ 'gs_temp' ] ).read_band( 1 )
-	lc_mod[ (lc_mod == 20) & (gs_temp < gs_value) & (treeline == 1) ] = 9
-	lc_mod[ (lc_mod == 20) ] = 6 # [TEM] keep this for tem
+	# lc_mod[ (lc_mod == 20) & (gs_temp < gs_value) & (treeline == 1) ] = 9
+	# lc_mod[ (lc_mod == 20) ] = 6 # [TEM] keep this for tem
 	# lc_mod[ (lc_mod == 20) ] = 0
+
+	lc_mod[ (lc_mod == 20) ] = 6 # test to turn all wetland no spruce bog to wetland tundra
 
 	# turn the placeholder class 8 (Temperate or sub-polar shrubland) into DECIDUOUS or SHRUB TUNDRA
 	# NOTE: may be best to do the treeline query here for these weird values <- (treeline == 1) etc
@@ -168,5 +133,5 @@ if __name__ == '__main__':
 	meta.update( meta_updater )
 
 	with rasterio.open( output_veg, 'w', **meta ) as out:
-		out.write_band( 1, lc_mod.astype( rasterio.uint8 ))
+		out.write_band( 1, lc_mod.astype( rasterio.uint8 ) )
 
