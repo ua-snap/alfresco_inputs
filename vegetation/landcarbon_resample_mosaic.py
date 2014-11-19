@@ -158,7 +158,6 @@ if __name__ == '__main__':
 
 	maritime = rasterio.open( output_resampled )
 	alfresco = rasterio.open( os.path.join( input_dir, 'alfresco_model_vegetation_input_2005.tif' ) )
-	# maritime_mask = rasterio.open( maritime_mask )
 
 	# reclassify martime to a common classification
 	output_filename = output_resampled.replace( '.tif', '_iem_rcl.tif' )
@@ -170,23 +169,10 @@ if __name__ == '__main__':
 	output_filename = alfresco.name.replace( '.tif', '_iem_rcl.tif' )
 	reclass_list = [[8,9,13],[9,10,8]]
 	alfresco_rcl = reclassify( alfresco, reclass_list, output_filename, band=1, creation_options={'compress':'lzw'} )
-	alfresco_rcl.close()
+	alfresco_rcl.close() # close it since there is no flush in rasterio
+	alfresco_rcl = rasterio.open( output_filename ) # and reopen
 
-	# mask out the NALCMS Kodiak Extent
-	alfresco_rcl = rasterio.open( output_filename )
-	meta = alfresco_rcl.meta
-	meta.update( compress='lzw', nodata=255 )
-	kodiak_mask_nalcms = rasterio.open( '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Output_Data/alfresco_vegetation_kodiak_mask.tif' )
-	output_filename = os.path.join( input_dir, 'mosaic_step1_mask_kodiak.tif' )
-	with rasterio.open( output_filename , 'w', **meta ) as out:
-		alfresco_rcl_arr = alfresco_rcl.read_band( 1 )
-		kodiak_mask_arr = kodiak_mask_nalcms.read_band( 1 )
-		alfresco_rcl_arr[ kodiak_mask_arr == 1 ] = 255
-		out.write_band( 1, alfresco_rcl_arr )
-
-	del maritime, alfresco
-
-	alfresco_rcl = rasterio.open( output_filename ) # read it back in after masking
+	# alfresco_rcl = rasterio.open( output_filename ) # read it back in after masking
 	maritime_rcl = rasterio.open( maritime_rcl.name )
 	
 	# generate an output colortable to pass to the new raster
@@ -194,7 +180,6 @@ if __name__ == '__main__':
 	cmap = qml_to_ctable( qml )
 
 	maritime_mask_1k = rasterio.open( '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Input_Data/maritime/combined_mask_alaska_only_akcan_1km.tif' )
-	# nlcd_mask_1k = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Input_Data/maritime/nlcd_2001_land_cover_maritime_mask_akcan_1km.tif'
 	nlcd_saltwater_mask = rasterio.open( '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Input_Data/maritime/nlcd_2001_land_cover_maritime_saltwater_mask_akcan_1km.tif' )
 	maritime_mask_canada = rasterio.open( '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Input_Data/maritime/combined_mask_canada_only_akcan_1km.tif' )
 	temperate_rf_mask = rasterio.open( '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Input_Data/maritime/digitized_removal_mask_temperate_rainforest_maritime.tif' )
@@ -204,7 +189,7 @@ if __name__ == '__main__':
 	# overlay 2 maps and fill-in where North Pacific Maritime (class 13)
 	meta = alfresco_rcl.meta
 	meta.update( compress='lzw', nodata=255 )
-	output_filename = os.path.join( input_dir, 'iem_model_vegetation_input_merged_b.tif' )
+	output_filename = os.path.join( input_dir, 'iem_model_vegetation_input_merged.tif' )
 	with rasterio.open( output_filename, 'w', **meta ) as out:
 		maritime_arr = maritime_rcl.read_band( 1 ).data
 		maritime_mask = maritime_mask_1k.read_band(1) # ( maritime_arr.data > 0 ).astype( np.uint8 )
@@ -215,8 +200,9 @@ if __name__ == '__main__':
 		iem_mask_arr = iem_mask.read_band( 1 )
 
 		# pass in values over the collective domain
-		ind = np.where( (maritime_mask == 1) & (akcan_arr == 13) ) # I changed this!
+		ind = np.where( (maritime_mask == 1) & (akcan_arr == 13) ) 
 		akcan_arr[ ind ] = maritime_arr[ ind ]
+
 		# remove the Canadian IEM domain Temperate Rainforest and convert to Maritime Upland Forest
 		akcan_arr[ (maritime_mask_can_arr == 1) & (akcan_arr == 13) ] = 9
 		# remove the rest of the errant Temperate Rainforest and convert to no veg
