@@ -34,50 +34,6 @@ def reclassify( rasterio_rst, reclass_list, output_filename, band=1, creation_op
 			band_arr[ np.logical_and( band_arr >= rcl[0], band_arr < rcl[1] ) ] = rcl[2]
 		out_rst.write_band( band, band_arr )
 	return rasterio.open( output_filename )
-def world2Pixel( geotransform, x, y ):
-	"""
-	Uses a geotransform (gdal.GetGeoTransform(), or rasterio equivalent)
-	to calculate the pixel location of a geospatial coordinate
-	"""
-	ulX = geotransform[0]
-	ulY = geotransform[3]
-	xDist = geotransform[1]
-	yDist = geotransform[5]
-	rtnX = geotransform[2]
-	rtnY = geotransform[4]
-	pixel = int((x - ulX) / xDist)
-	line = int((ulY - y) / xDist)
-	return ( pixel, line )
-def bounds_to_window( geotransform, rasterio_bounds ):
-	'''
-	return a rasterio window tuple-of-tuples used to read a subset
-	of a rasterio raster file into a numpy array.  This is done by 
-	passing the window argument in the:
-		 dataset.read_band() or dataset.write_band()
-
-	This function returns an object acceptable for use as a window 
-	passed to the window argument.
-
-	Notes:
-	A window is a view onto a rectangular subset of a raster dataset
-	and is described in rasterio by a pair of range tuples.
-	window = ((row_start, row_stop), (col_start, col_stop))
-
-	arguments:
-		geotransform = 6-element rasterio transform 
-			* typically from dataset.transform
-		rasterio_bounds = (lower left x, lower left y, upper right x, upper right y)
-			* typically from dataset.bounds in rasterio
-	** This also requires the world2Pixel function.
-
-	Depends:
-		rasterio
-
-	'''
-	ll = rasterio_bounds[:2]
-	ur = rasterio_bounds[2:]
-	ll_xy, ur_xy = [ world2Pixel( geotransform, x, y ) for x, y in [ll, ur] ]
-	return (( ur_xy[1], ll_xy[1]), ( ll_xy[0], ur_xy[0]))
 def hex_to_rgb( hex ):
 	'''
 	borrowed and modified from Matthew Kramer's blog:
@@ -125,36 +81,20 @@ if __name__ == '__main__':
 	input_filename = os.path.join( input_dir, 'landcarbon_vegetation_modelinput_maritime_2001_v0_4.tif' )
 	output_resampled = os.path.join( input_dir, 'landcarbon_vegetation_modelinput_maritime_2001_v0_4_1km.tif' )
 
-		# if os.path.exists( output_resampled ):
-		# 	[ os.remove( i ) for i in glob.glob( output_resampled[:-3] + '*' ) ]
+	if os.path.exists( output_resampled ):
+		[ os.remove( i ) for i in glob.glob( output_resampled[:-3] + '*' ) ]
 
-		# shutil.copy( os.path.join( input_dir, 'alfresco_model_vegetation_input_2005.tif' ), output_resampled )
-		# maritime = rasterio.open( output_resampled ) # something odd here but this hack works -- does nothing
-		# with rasterio.open( output_resampled, 'r+' ) as maritime:
-		# 	arr = maritime.read_band( 1 ).data
-		# 	arr[:] = 0
-		# 	maritime.write_band( 1, arr )
-		# 	del arr
+	shutil.copy( os.path.join( input_dir, 'alfresco_model_vegetation_input_2005.tif' ), output_resampled )
+	maritime = rasterio.open( output_resampled ) # something odd here but this hack works -- does nothing
+	with rasterio.open( output_resampled, 'r+' ) as maritime:
+		arr = maritime.read_band( 1 ).data
+		arr[:] = 0
+		maritime.write_band( 1, arr )
+		del arr
 
-		# # use gdalwarp to reproject and resample to the full akcanada domain
-		# command = 'gdalwarp -r mode -multi -srcnodata None ' + input_filename + ' ' + output_resampled
-		# os.system( command )
-
-
-
-	# # now do the same thing with the combined maritime mask
-	# output_resampled = os.path.join( input_dir, 'landcarbon_vegetation_modelinput_maritime_mask_1km.tif' )
-	# shutil.copy( '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Input_Data/alaska_canada/alfresco_vegetation_mask.tif' , output_resampled )
-	# maritime_mask = rasterio.open( output_resampled ) # something odd here but this hack works -- does nothing
-	# with rasterio.open( output_resampled, 'r+' ) as maritime_mask:
-	# 	arr = maritime_mask.read_band( 1 ).data
-	# 	arr[:] = 0
-	# 	maritime_mask.write_band( 1, arr )
-	# 	del arr
-
-	# combined_mask = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Input_Data/maritime/combined_mask.tif'
-	# command = 'gdalwarp -r mode  -multi -srcnodata None ' + combined_mask + ' ' + output_resampled
-	# os.system( command )
+	# use gdalwarp to reproject and resample to the full akcanada domain
+	command = 'gdalwarp -r mode -multi -srcnodata None ' + input_filename + ' ' + output_resampled
+	os.system( command )
 
 	maritime = rasterio.open( output_resampled )
 	alfresco = rasterio.open( os.path.join( input_dir, 'alfresco_model_vegetation_input_2005.tif' ) )
@@ -184,6 +124,7 @@ if __name__ == '__main__':
 	maritime_mask_canada = rasterio.open( '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Input_Data/maritime/combined_mask_canada_only_akcan_1km.tif' )
 	temperate_rf_mask = rasterio.open( '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Input_Data/maritime/digitized_removal_mask_temperate_rainforest_maritime.tif' )
 	iem_mask = rasterio.open( '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Input_Data/maritime/iem_mask_1km_akcan.tif' )
+	akcan_mask = rasterio.open( '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Input_Data/alaska_canada/alfresco_vegetation_mask.tif' )
 
 	# extend the extent of the martime data to match the extent of the alfresco data
 	# overlay 2 maps and fill-in where North Pacific Maritime (class 13)
@@ -198,6 +139,7 @@ if __name__ == '__main__':
 		nlcd_sw_arr = nlcd_saltwater_mask.read_band( 1 )
 		temperate_rf_mask_arr = temperate_rf_mask.read_band( 1 )
 		iem_mask_arr = iem_mask.read_band( 1 )
+		akcan_mask_arr = akcan_mask.read_band( 1 )
 
 		# pass in values over the collective domain
 		ind = np.where( (maritime_mask == 1) & (akcan_arr == 13) ) 
@@ -214,6 +156,7 @@ if __name__ == '__main__':
 
 		# [not yet implemented] potentially find pixels in akcan that had veg data but do not in the new version
 		#  and replace their value with their neighbors that are not nodata.
+		# akcan_arr[ akcan_mask_arr == 0 ]
 		
 		out.write_band( 1, akcan_arr )
 		out.write_colormap( 1, cmap )

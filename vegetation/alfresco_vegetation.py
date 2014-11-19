@@ -61,7 +61,7 @@ if __name__ == '__main__':
 	input_dir = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Input_Data/alaska_canada'
 	output_dir = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Output_Data'
 	
-	output_veg = os.path.join( output_dir, 'alfresco_model_vegetation_input_2005.tif' )
+	output_veg = os.path.join( output_dir, 'alfresco_model_vegetation_input_2005_TEST.tif' )
 	meta_updater = dict( driver='GTiff', dtype=rasterio.uint8, compress='lzw', crs={'init':'epsg:3338'}, count=1, nodata=255 )
 
 	input_paths = {
@@ -85,21 +85,13 @@ if __name__ == '__main__':
 	# convert wetland to spruce bog and wetland
 	coast_spruce_bog = rasterio.open( input_paths[ 'coast_spruce_bog' ] ).read_band( 1 )
 	lc_mod[ (lc_mod == 14) & (coast_spruce_bog == 2) ] = 9
-	lc_mod[ (lc_mod == 14) & (coast_spruce_bog != 2) ] = 20
-
-	# coastal wetland class to WETLAND TUNDRA or NO VEG based on the gs_temp (Average Growing Season Temperature) values
-	treeline = rasterio.open( input_paths[ 'treeline' ] ).read_band( 1 )
-	gs_temp = rasterio.open( input_paths[ 'gs_temp' ] ).read_band( 1 )
-	# lc_mod[ (lc_mod == 20) & (gs_temp < gs_value) & (treeline == 1) ] = 9
-	# lc_mod[ (lc_mod == 20) ] = 6 # [TEM] keep this for tem
-	# lc_mod[ (lc_mod == 20) ] = 0
-
-	lc_mod[ (lc_mod == 20) ] = 6 # test to turn all wetland no spruce bog to wetland tundra
+	lc_mod[ (lc_mod == 14) & (coast_spruce_bog != 2) ] = 6 # remaining coastal wetland converts directly to WETLAND TUNDRA
 
 	# turn the placeholder class 8 (Temperate or sub-polar shrubland) into DECIDUOUS or SHRUB TUNDRA
-	# NOTE: may be best to do the treeline query here for these weird values <- (treeline == 1) etc
+	gs_temp = rasterio.open( input_paths[ 'gs_temp' ] ).read_band( 1 )
 	lc_mod[ (lc_mod == 8) & (gs_temp < gs_value) ] = 4
 	lc_mod[ (lc_mod == 8) & (gs_temp >= gs_value) ] = 3
+	del gs_temp
 
 	# Reclass Sub-polar or polar grassland-lichen-moss as GRAMMINOID TUNDRA
 	lc_mod[ (lc_mod == 10) | (lc_mod == 12) ] = 5
@@ -113,10 +105,6 @@ if __name__ == '__main__':
 
 	# [TEM] convert Barren to Heath
 	lc_mod[ (lc_mod == 16) ] = 9
-
-	# reclassify erroneous spruce pixels with the most common values of its neighbors
-	# lc_mod = replace_erroneous_treeline( lc_mod, treeline )
-	lc_mod[ ((lc_mod == 1) | (lc_mod == 2)) & (treeline == 1) ] = 5 # just convert it to gramminoid tundra which is the whole area...
 
 	# temperate rainforest (seak) region delineation
 	temperate_rainforest = rasterio.open( input_paths[ 'NoPac' ] ).read_band( 1 )

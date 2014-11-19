@@ -3,6 +3,9 @@ import numpy as np
 
 ###
 # REQUIRES GDAL 1.8.0 + 
+#
+# This is more of a roadmap to how we got to specific mask results than it is a script.
+# Keep this in mind when reading the processes used to get to the needed masks.
 ###
 
 input_dir = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Output_Data'
