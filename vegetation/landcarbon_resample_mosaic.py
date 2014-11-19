@@ -204,7 +204,7 @@ if __name__ == '__main__':
 	# overlay 2 maps and fill-in where North Pacific Maritime (class 13)
 	meta = alfresco_rcl.meta
 	meta.update( compress='lzw', nodata=255 )
-	output_filename = os.path.join( input_dir, 'iem_model_vegetation_input_merged.tif' )
+	output_filename = os.path.join( input_dir, 'iem_model_vegetation_input_merged_b.tif' )
 	with rasterio.open( output_filename, 'w', **meta ) as out:
 		maritime_arr = maritime_rcl.read_band( 1 ).data
 		maritime_mask = maritime_mask_1k.read_band(1) # ( maritime_arr.data > 0 ).astype( np.uint8 )
@@ -215,7 +215,7 @@ if __name__ == '__main__':
 		iem_mask_arr = iem_mask.read_band( 1 )
 
 		# pass in values over the collective domain
-		ind = np.where( maritime_mask == 1 ) #  (akcan_arr == 13) & 
+		ind = np.where( (maritime_mask == 1) & (akcan_arr == 13) ) # I changed this!
 		akcan_arr[ ind ] = maritime_arr[ ind ]
 		# remove the Canadian IEM domain Temperate Rainforest and convert to Maritime Upland Forest
 		akcan_arr[ (maritime_mask_can_arr == 1) & (akcan_arr == 13) ] = 9
@@ -225,6 +225,9 @@ if __name__ == '__main__':
 		
 		# anything left on the canada side convert to Maritime Upland Forest
 		akcan_arr[ (iem_mask_arr == 1) & (akcan_arr == 13) ] = 9
+
+		# [not yet implemented] potentially find pixels in akcan that had veg data but do not in the new version
+		#  and replace their value with their neighbors that are not nodata.
 		
 		out.write_band( 1, akcan_arr )
 		out.write_colormap( 1, cmap )
