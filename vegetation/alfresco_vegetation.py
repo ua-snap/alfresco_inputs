@@ -14,10 +14,12 @@
 # lc = (+1,0)
 # lr = (+1,+1)
 
+[(-2,-2),(-2,-1),(-2,0),(-2,1),(-2,2),(-1,-2),(-1,-1),(-1,0),(-1,1),(-1,2),(0,-2),(0,-1),(0,1),(0,2),(1,-2),(1,-1),(1,0),(1,1),(1,2),(2,-2),(2,-1),(2,0),(2,1),(2,2)]
+
+
 def reclassify( rasterio_rst, reclass_list, output_filename, band=1, creation_options=dict() ):
 	'''
 	MODIFIED: removed window walking...  too slow..
-
 	this function will take a raster image as input and
 	reclassify its values given in the reclass_list.
 	The reclass list is a simple list of lists with the 
@@ -52,6 +54,66 @@ def reclassify( rasterio_rst, reclass_list, output_filename, band=1, creation_op
 		out_rst.write_band( band, band_arr )
 	return rasterio.open( output_filename )
 
+def replace_erroneous_treeline( lc2d, tl2d ):
+	''' replace values based on neighbors of offenders and a where condition 
+		arguments:
+			lc2d = 2d landcover array with erroneous values within
+			tl2d = 2d treeline boolean array to subset the landcover array
+		returns:
+			2d numpy array with the erroneous values removed
+
+	'''
+	ind = np.where( (((lc2d == 1) | (lc2d == 2)) & (tl2d == 1)) ) # this is hardwired...
+	ind_zip = zip( *ind )
+	print len( ind_zip )
+	if len( ind_zip ) == 0:
+		return lc2d
+	else:
+		index_groups = [[( i-2, j-2 ),
+						( i-2, j-1 ),
+						( i-2, j+0 ),
+						( i-2, j +1 ),
+						( i-2, j +2 ),
+						( i-1, j-2 ),
+						( i-1, j-1 ),
+						( i-1, j+0 ),
+						( i-1, j+1 ),
+						( i-1, j+2 ),
+						( i+0, j-2 ),
+						( i+0, j-1 ),
+						( i+0, j+1 ),
+						( i+0, j+2 ),
+						( i+1, j-2 ),
+						( i+1, j-1 ),
+						( i+1, j+0 ),
+						( i+1, j+1 ),
+						( i+1, j+2 ),
+						( i+2, j-2 ),
+						( i+2, j-1 ),
+						( i+2, j+0 ),
+						( i+2, j+1 ),
+						( i+2, j+2 ) ]
+						for i,j in ind_zip ]
+		
+		for count, group in enumerate( index_groups ):
+			cols = np.array( [j for i,j in group] )
+			rows = np.array( [i for i,j in group] )
+			vals = lc2d[ ( rows, cols ) ]
+			vals = vals[ (vals!=1) & (vals!=2) ] # (vals != 0) & (vals!=1) & (vals!=2) 
+
+			uniques, counts = np.unique( vals, return_counts = True )
+			new_val = uniques[ np.argmax( counts ) ]
+			
+			if new_val == 0:
+				try:
+					vals = vals[ (vals > 0) ]
+					uniques, counts = np.unique( vals, return_counts = True )
+					new_val = uniques[ np.argmax( counts ) ]
+				except:
+					new_val = 0	
+			lc2d[ ind_zip[ count ] ] = new_val
+		return replace_erroneous_treeline( lc2d, tl2d )
+
 if __name__ == '__main__':
 	import rasterio, fiona, os, sys
 	import numpy as np
@@ -61,7 +123,7 @@ if __name__ == '__main__':
 	input_dir = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Input_Data/alaska_canada'
 	output_dir = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Output_Data'
 	
-	output_veg = os.path.join( output_dir, 'alfresco_model_vegetation_input_2005_TEST.tif' )
+	output_veg = os.path.join( output_dir, 'alfresco_model_vegetation_input_2005_FINAL_TEST.tif' )
 	meta_updater = dict( driver='GTiff', dtype=rasterio.uint8, compress='lzw', crs={'init':'epsg:3338'}, count=1, nodata=255 )
 
 	input_paths = {
@@ -82,16 +144,18 @@ if __name__ == '__main__':
 	lc_mod = lc_mod.read_band( 1 )
 	lc_mod.fill_value = 9999
 
-	# convert wetland to spruce bog and wetland
+	# convert wetland to spruce bog and wetland tundra (TEM brings all back that are no veg)
 	coast_spruce_bog = rasterio.open( input_paths[ 'coast_spruce_bog' ] ).read_band( 1 )
 	lc_mod[ (lc_mod == 14) & (coast_spruce_bog == 2) ] = 9
-	lc_mod[ (lc_mod == 14) & (coast_spruce_bog != 2) ] = 6 # remaining coastal wetland converts directly to WETLAND TUNDRA
+	lc_mod[ (lc_mod == 14) & (coast_spruce_bog != 2) ] = 6
 
+	# coastal wetland class to WETLAND TUNDRA or NO VEG based on the gs_temp (Average Growing Season Temperature) values
+	
 	# turn the placeholder class 8 (Temperate or sub-polar shrubland) into DECIDUOUS or SHRUB TUNDRA
+	# NOTE: may be best to do the treeline query here for these weird values <- (treeline == 1) etc
 	gs_temp = rasterio.open( input_paths[ 'gs_temp' ] ).read_band( 1 )
 	lc_mod[ (lc_mod == 8) & (gs_temp < gs_value) ] = 4
 	lc_mod[ (lc_mod == 8) & (gs_temp >= gs_value) ] = 3
-	del gs_temp
 
 	# Reclass Sub-polar or polar grassland-lichen-moss as GRAMMINOID TUNDRA
 	lc_mod[ (lc_mod == 10) | (lc_mod == 12) ] = 5
@@ -105,6 +169,10 @@ if __name__ == '__main__':
 
 	# [TEM] convert Barren to Heath
 	lc_mod[ (lc_mod == 16) ] = 9
+
+	# reclassify erroneous spruce pixels with the most common values of its 16 neighbors
+	treeline = rasterio.open( input_paths[ 'treeline' ] ).read_band( 1 )
+	lc_mod = replace_erroneous_treeline( lc_mod, treeline )
 
 	# temperate rainforest (seak) region delineation
 	temperate_rainforest = rasterio.open( input_paths[ 'NoPac' ] ).read_band( 1 )
@@ -122,4 +190,3 @@ if __name__ == '__main__':
 
 	with rasterio.open( output_veg, 'w', **meta ) as out:
 		out.write_band( 1, lc_mod.astype( rasterio.uint8 ) )
-
