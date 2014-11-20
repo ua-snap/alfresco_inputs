@@ -1,47 +1,8 @@
 # # # # 
 # reclassify NLCD 2001 Landcover for the LandCarbon project 
 #	SEAK / SCAK / Kodiak Island Domains
+# Author: Michael Lindgren (malindgren@alaska.edu) 
 # # # # 
-
-# Dev Notes:
-# ---
-#  Legend: 
-#  0 - NoVeg 
-#  1 - Black Spruce 
-#  2 - White Spruce 
-#  3 - Deciduous 
-#  4 - Shrub Tundra 
-#  5 - Graminoid  Tundra 
-#  6 - Wetland Tundra 
-#  7 - Barren lichen-moss 
-#  8 - Temperate Rainforest (there will still be some in Canada to Contend with)
-#  9 - Heath
-#  10 - Upland
-#  11 - Forested Wetland
-#  12 - Fen
-#  13 - Other Veg
-#  14 - Alpine (optional)
-#  15 - Alder
-
-#  ** 16 no veg
-#  ** 17 saltwater
-
-
-# # # OUTPUT LEGEND # # # #
-#
-#	1 - not modeled
-#	2 - white spruce
-#	3 - deciduous
-#	4 - shrub tundra
-#	5 - gramminoid tundra
-#	6 - wetland tundra
-#	7 - heath
-#	8 - upland forest
-#	9 - forested wetland
-#	10 - fen
-#	11 - alder
-#	255 - out of bounds
-# # # # # # # # # # # # # # # 
 
 def hex_to_rgb( hex ):
 	'''
@@ -62,10 +23,10 @@ def hex_to_rgb( hex ):
 		** we need to figure out how to calculate that alpha value correctly.
 
 	'''
-	hex = hex.lstrip('#')
-	hlen = len(hex)
-	rgb = [ int( hex[i:i+hlen/3], 16 ) for i in range(0, hlen, hlen/3) ]
-	rgb.insert(len(rgb)+1, 1)
+	hex = hex.lstrip( '#' )
+	hlen = len( hex )
+	rgb = [ int( hex[ i : i + hlen/3 ], 16 ) for i in range( 0, hlen, hlen/3 ) ]
+	rgb.insert( len( rgb ) + 1, 1 )
 	return rgb
 
 def qml_to_ctable( qml ):
@@ -81,7 +42,7 @@ def qml_to_ctable( qml ):
 	'''
 	import xml.etree.cElementTree as ET
 	tree = ET.ElementTree( file=qml  )
-	return { int( i.get( 'value' ) ) : tuple( hex_to_rgb( i.get('color') ) ) for i in tree.iter( tag='item' ) }
+	return { int( i.get( 'value' ) ) : tuple( hex_to_rgb( i.get( 'color' ) ) ) for i in tree.iter( tag='item' ) }
 
 if __name__ == '__main__':
 	import os, rasterio, fiona, shutil
@@ -118,7 +79,7 @@ if __name__ == '__main__':
 		lc_arr.fill_value = 255
 		lc_arr = lc_arr.filled()
 
-		## ## seak reclass ## ##
+		## ##  --- seak reclass --- ## ##
 		# collapse initial undesired classes to noveg
 		lc_arr = lc.read_band( 1 )
 		lc_arr[ (lc_arr >= 0) & (lc_arr <= 31 ) ] = 1 # potentially 0 later on
@@ -140,7 +101,7 @@ if __name__ == '__main__':
 		lc_arr[ (logged == 1) & (seak_mask == 1) ] = 8
 		del logged
 
-		## ## scak reclass ## ##
+		## ##  --- scak reclass --- ## ##
 		# alder
 		lc_arr[ (lc_arr == 41) & (scak_mask == 1) ] = 11	
 		# white spruce
@@ -159,7 +120,7 @@ if __name__ == '__main__':
 		# leftover 82 (Cultivated Crops) in the scak
 		lc_arr[ (lc_arr == 82) & (scak_mask == 1) ] = 1
 
-		## ## kodiak reclass ## ##
+		## ##  --- kodiak reclass --- ## ##
 		# deciduous
 		lc_arr[ (lc_arr == 41) & (kodiak_mask == 1) ] = 3
 		# upland forest
