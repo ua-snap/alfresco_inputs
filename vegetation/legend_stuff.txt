@@ -1,4 +1,4 @@
-# Dev Notes: NEW LEGEND FINAL!
+# FINAL OUTPUT COMBINED LEGEND:
 # ---
 #  Legend: 
 0 - NoVeg 
@@ -19,7 +19,8 @@
 
 
 
-# NALCMS BASE LEGEND:
+
+# NALCMS (original) BASE LEGEND (from metadata):
 # 1      Temperate or sub-polar needleleaf forest  0     0.24  0
 # 2      Sub-polar taiga needleleaf forest         0.58  0.61  0.44
 # 3      Tropical or sub-tropical broadleaf 
@@ -44,16 +45,19 @@
 # 19     Snow and Ice                              1     0.98  1
 
 
+
+
+# NOTES ABOUT INTEGRATING THE TEM GROUPS CHANGES TO THE ALFRESCO VEGETATION MAP
 # All cells in the LandCover_iem_ALFRESCO_2005.tif file that were classed as 0 - No veg, were reset back to the original NALCMS values. 
 # In this new file, cells classified as Cropland, Urban and Built-up, Water, and Snow and Ice were reclassified as 0 - No veg, 
 # cells classified as Wetland were set to Wetland Tundra, and cells classified as Barren Lands were reclassified to Heath.
+	no_veg = [15, 17, 18, 19] - ok
+	wetland_tundra = [14] 
+	heath = [16] - ok
 
-no_veg = [15, 17, 18, 19] - ok
-wetland_tundra = [14] # * may have to happen at the last step
-heath = [16] - ok
 
 
-# # # OUTPUT LEGEND # # # #
+# # # FINAL MARITIME-ONLY DOMAIN LEGEND # # # #
 #
 1 - not modeled
 2 - white spruce
@@ -62,17 +66,15 @@ heath = [16] - ok
 5 - gramminoid tundra
 6 - wetland tundra
 7 - heath
-8 - upland forest
-9 - forested wetland
-10 - fen
-11 - alder
+8 - maritime upland forest
+9 - maritime forested wetland
+10 - maritime fen
+11 - maritime alder shrubland
 255 - out of bounds
 
-# # # # # # # # # # # # # # # 
 
 
-
-# THE OLD ALFRESCO CLASSIFICATION
+# # #  THE OLD AKCAN ALFRESCO CLASSIFICATION (pre-SEAK) # # # # 
 0 - Not Modeled
 1 - Black Spruce
 2 - White Spruce
@@ -84,19 +86,3 @@ heath = [16] - ok
 8 - Temperate Rainforest
 9 - Heath
 255 - out of bounds
-
-
-AKCan Current Legend:
-
-0 - Not Modeled
-1 - Black Spruce
-2 - White Spruce
-3 - Deciduous
-4 - Shrub Tundra
-5 - Graminoid Tundra
-6 - Wetland Tundra
-7 - Barren lichen-moss
-8 - Temperate Rainforest
-9 - Heath
-255 - out of bounds
-
