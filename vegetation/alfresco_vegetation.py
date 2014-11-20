@@ -14,9 +14,6 @@
 # lc = (+1,0)
 # lr = (+1,+1)
 
-[(-2,-2),(-2,-1),(-2,0),(-2,1),(-2,2),(-1,-2),(-1,-1),(-1,0),(-1,1),(-1,2),(0,-2),(0,-1),(0,1),(0,2),(1,-2),(1,-1),(1,0),(1,1),(1,2),(2,-2),(2,-1),(2,0),(2,1),(2,2)]
-
-
 def reclassify( rasterio_rst, reclass_list, output_filename, band=1, creation_options=dict() ):
 	'''
 	MODIFIED: removed window walking...  too slow..
@@ -65,7 +62,7 @@ def replace_erroneous_treeline( lc2d, tl2d ):
 	'''
 	ind = np.where( (((lc2d == 1) | (lc2d == 2)) & (tl2d == 1)) ) # this is hardwired...
 	ind_zip = zip( *ind )
-	print len( ind_zip )
+	# print len( ind_zip )
 	if len( ind_zip ) == 0:
 		return lc2d
 	else:
@@ -123,7 +120,7 @@ if __name__ == '__main__':
 	input_dir = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Input_Data/alaska_canada'
 	output_dir = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Output_Data'
 	
-	output_veg = os.path.join( output_dir, 'alfresco_model_vegetation_input_2005_FINAL_TEST.tif' )
+	output_veg = os.path.join( output_dir, 'alfresco_model_vegetation_input_2005.tif' )
 	meta_updater = dict( driver='GTiff', dtype=rasterio.uint8, compress='lzw', crs={'init':'epsg:3338'}, count=1, nodata=255 )
 
 	input_paths = {
