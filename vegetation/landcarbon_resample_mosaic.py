@@ -1,4 +1,8 @@
-# resample the data to 1km and mosaick with the larger IEM extent
+# # 
+# resample to 1km,mosaick with AKCAN extent, and clip/crop to desired output extent
+# Author: Michael Lindgren (malindgren@alaska.edu)
+# # 
+
 def reclassify( rasterio_rst, reclass_list, output_filename, band=1, creation_options=dict() ):
 	'''
 	MODIFIED: removed window walking...  too slow..
@@ -53,10 +57,10 @@ def hex_to_rgb( hex ):
 		** we need to figure out how to calculate that alpha value correctly.
 
 	'''
-	hex = hex.lstrip('#')
-	hlen = len(hex)
-	rgb = [ int( hex[i:i+hlen/3], 16 ) for i in range(0, hlen, hlen/3) ]
-	rgb.insert(len(rgb)+1, 1)
+	hex = hex.lstrip( '#' )
+	hlen = len( hex )
+	rgb = [ int( hex[ i : i + hlen/3 ], 16 ) for i in range( 0, hlen, hlen/3 ) ]
+	rgb.insert( len( rgb ) + 1, 1 )
 	return rgb
 def qml_to_ctable( qml ):
 	'''
@@ -71,7 +75,8 @@ def qml_to_ctable( qml ):
 	'''
 	import xml.etree.cElementTree as ET
 	tree = ET.ElementTree( file=qml  )
-	return { int( i.get( 'value' ) ) : tuple( hex_to_rgb( i.get('color') ) ) for i in tree.iter( tag='item' ) }
+	return { int( i.get( 'value' ) ) : tuple( hex_to_rgb( i.get( 'color' ) ) ) for i in tree.iter( tag='item' ) }
+
 
 if __name__ == '__main__':
 	import os, rasterio, fiona, shutil, glob
@@ -130,10 +135,10 @@ if __name__ == '__main__':
 	# overlay 2 maps and fill-in where North Pacific Maritime (class 13)
 	meta = alfresco_rcl.meta
 	meta.update( compress='lzw', nodata=255 )
-	output_filename = os.path.join( input_dir, 'iem_model_vegetation_input_merged.tif' )
+	output_filename = os.path.join( input_dir, 'alfresco_vegetation_model_input.tif' )
 	with rasterio.open( output_filename, 'w', **meta ) as out:
 		maritime_arr = maritime_rcl.read_band( 1 ).data
-		maritime_mask = maritime_mask_1k.read_band(1) # ( maritime_arr.data > 0 ).astype( np.uint8 )
+		maritime_mask = maritime_mask_1k.read_band(1)
 		maritime_mask_can_arr = maritime_mask_canada.read_band( 1 )
 		akcan_arr = alfresco_rcl.read_band( 1 ).data
 		nlcd_sw_arr = nlcd_saltwater_mask.read_band( 1 )
@@ -151,7 +156,7 @@ if __name__ == '__main__':
 		akcan_arr[ (nlcd_sw_arr == 1) & (akcan_arr == 13) ] = 0
 		akcan_arr[ (temperate_rf_mask_arr == 1) & (akcan_arr == 13) ] = 0
 		
-		# anything left on the canada side convert to Maritime Upland Forest
+		# any Temperate Rainforest in SEAK domain on Canada side convert to Maritime Upland Forest
 		akcan_arr[ (iem_mask_arr == 1) & (akcan_arr == 13) ] = 9
 
 		# [not yet implemented] potentially find pixels in akcan that had veg data but do not in the new version
@@ -161,15 +166,10 @@ if __name__ == '__main__':
 		out.write_band( 1, akcan_arr )
 		out.write_colormap( 1, cmap )
 
-
-
-# [ TEM ] class changes from original
-
-# All cells in the LandCover_iem_ALFRESCO_2005.tif file that were classed as 0 - No veg, were reset back to the original NALCMS values. 
-# In this new file, cells classified as Cropland, Urban and Built-up, Water, and Snow and Ice were reclassified as 0 - No veg, 
-# cells classified as Wetland were set to Wetland Tundra, and cells classified as Barren Lands were reclassified to Heath.
-
-# no_veg = [15, 17, 18, 19]
-# wetland_tundra = [14] 
-# heath = [16]
+	# crop to the IEM extent
+	iem_domain_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Input_Data/extents/AIEM_domain.shp'
+	output_filename = os.path.join( input_dir, 'iem_vegetation_model_input.tif' )
+	
+	command = 'gdalwarp -cutline ' + iem_domain_path + ' -crop_to_cutline ' + out.name + ' ' + output_filename
+	os.system( command )
 
