@@ -10,7 +10,7 @@ Original NLCD and NALCMS data, including legends:
 2 - White Spruce  
 3 - Deciduous  
 4 - Shrub Tundra  
-5 - Graminoid  Tundra  
+5 - Graminoid Tundra  
 6 - Wetland Tundra  
 7 - Barren lichen-moss  
 8 - Heath  
@@ -125,35 +125,29 @@ The steps of reclassification of the NALCMS Land Cover Map are:
 
 1. Once the area of interest (AOI) is determined the input map was clipped to that extent.  The resulting classes in the  
 AOI are:
+        0.  out of bounds 
+        1.  Temperate or sub-polar needleleaf forest
+        2.  Sub-polar taiga needleleaf forest
+        5.  Temperate or sub-polar broadleaf deciduous
+        6.  Mixed Forest
+        8.  Temperate or sub-polar shrubland
+        10. Temperate or sub-polar grassland
+        11. Sub-polar or polar shrubland-lichen-moss
+        12. Sub-polar or polar grassland-lichen-moss 
+        13. Sub-polar or polar barren-lichen-moss
+        14. Wetland
+        15. Cropland
+        16. Barren Lands
+        17. Urban and Built-up
+        18. Water
+        19. Snow and Ice
 
-0 = out of bounds
-1 = Temperate or sub-polar needleleaf forest
-2 = Sub-polar taiga needleleaf forest
-5 = Temperate or sub-polar broadleaf deciduous
-6 = Mixed Forest
-8 = Temperate or sub-polar shrubland
-10 = Temperate or sub-polar grassland
-11 = Sub-polar or polar shrubland-lichen-moss
-12 = Sub-polar or polar grassland-lichen-moss 
-13 = Sub-polar or polar barren-lichen-moss
-14 = Wetland
-15 = Cropland
-16 = Barren Lands
-17 = Urban and Built-up
-18 = Water
-19 = Snow and Ice
-
-These classes were collapsed to:
-
-classes 15,16,17,18,19 were reclassed as no vegetation.
-
-classes 1,2 were reclassed as a spruce class.
-
-classes 5,6 were reclassed as deciduous
-
-class 11 was reclassed as shrub tundra
-
-The remainder of the classes were left as is for further classification in later steps
+These initial classes were reclassed as follows:
+* classes [ 15, 17, 18, 19 ] were reclassed as no vegetation.
+* classes [ 1, 2 ] were reclassed as a spruce class.
+* classes [ 5, 6 ] were reclassed as deciduous
+* class [ 11 ] was reclassed as shrub tundra
+* The remaining initial classes were left as-is for further classification using ancillary layers.
 
 2. The wetland class was reclassified using the coastal_interior layer into coastal wetlands and interior spruce bogs (spruce class).
 
