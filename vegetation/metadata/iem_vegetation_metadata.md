@@ -1,3 +1,5 @@
+This is a test edit by Tom to see what happens in gitbut, it says it is forking this project for me, and that submitting a change will write it to a new branch so I can "send a pull request"
+
 This 1km land cover dataset represent highly modified output originating from the Alaska portion of the North American Land Change Monitoring System (NALCMS) 2005 dataset as well as the National Land Cover Dataset 2001.  This model input dataset was developed solely for use in the ALFRESCO, TEM, GIPL and the combined Integrated Ecosystem Model landscape scale modeling studies and is not representative of any ground based observations.
 
 Original NLCD and NALCMS data, including legends:  
