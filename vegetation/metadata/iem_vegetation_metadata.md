@@ -1,9 +1,9 @@
 This 1km land cover dataset represent highly modified output originating from the Alaska portion of the North American Land Change Monitoring System (NALCMS) 2005 dataset as well as the National Land Cover Dataset 2001.  This model input dataset was developed solely for use in the ALFRESCO, TEM, GIPL and the combined Integrated Ecosystem Model landscape scale modeling studies and is not representative of any ground based observations.
 
 Original NLCD and NALCMS data, including legends: 
-[NALCMS data]:(http://www.cec.org/Page.asp?PageID=924&ContentID=2819&AA_SiteLanguageID=1)  
-[NALCMS data]
-[NLCD 2001]:(http://www.mrlc.gov/nlcd01_data.php)
+[NALCMS data]:http://www.cec.org/Page.asp?PageID=924&ContentID=2819&AA_SiteLanguageID=1
+[NALCMS data]  
+[NLCD 2001]:http://www.mrlc.gov/nlcd01_data.php
 [NLCD 2001]
 
 **Legend:  
@@ -19,7 +19,7 @@ Original NLCD and NALCMS data, including legends:
 9 - Maritime Upland Forest  
 10 - Maritime Forest Wetland  
 11 - Maritime Fen  
-12 - Maritime Alder Shrubland**  
+12 - Maritime Alder Shrubland**
 
 ##Methods of production:
 ***
@@ -173,6 +173,4 @@ These initial classes were reclassed as follows:
 
 ###end of Alaska Mainland process
 
-###add info about areas in Canada
-
-###All 4 regions were then mosaiced together into a single final map.
+**All 4 regions were then mosaiced together at 1km spatial resolution into a single final map.**
