@@ -24,7 +24,7 @@ Original NLCD and NALCMS data, including legends:
 11 | Maritime Fen  
 12 | Maritime Alder Shrubland
 
-![alt text](https://github.com/EarthScientist/alfresco_inputs/blob/master/vegetation/metadata/iem_vegetation_model_input_v0_4_map.png "IEM Vegatation Model Input Map Composition")
+![alt text](https://github.com/EarthScientist/alfresco_inputs/blob/master/vegetation/metadata/iem_vegetation_model_input_v0_4_map.png "IEM Vegetation Model Input Map Composition")
 
 ##Methods of production:
 ***
