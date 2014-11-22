@@ -24,6 +24,10 @@ Original NLCD and NALCMS data, including legends:
 11 | Maritime Fen  
 12 | Maritime Alder Shrubland**
 
+[iem_map]: https://github.com/EarthScientist/alfresco_inputs/blob/master/vegetation/metadata/iem_vegetation_model_input_v0_4_map.png
+
+[iem_map]
+
 ##Methods of production:
 ***
 Due to specific models' input land cover input requirements, including the fact that each model is primarily focused on different descriptive aspects of land cover (i.e. ALFRESCO considers land cover in respect to how it burns, TEM considers land cover in respect to how it cycles carbon through the system, and GIPL considers land cover with respect to its influence on its insulative qualities of the soil), 4 distinct subregions were delineated with unique set  of reclassification rules. Those regions are generally named below and also list the Unified Ecoregions of Alaska: 2001 (Nowacki et al 2001) Commoner names that make up each subregion.
