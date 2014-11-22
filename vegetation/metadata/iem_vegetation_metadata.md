@@ -6,20 +6,23 @@ Original NLCD and NALCMS data, including legends:
 [NLCD 2001]:http://www.mrlc.gov/nlcd01_data.php
 [NLCD 2001]
 
-**Legend:  
-0 - Not Modeled  
-1 - Black Spruce  
-2 - White Spruce  
-3 - Deciduous  
-4 - Shrub Tundra  
-5 - Graminoid Tundra  
-6 - Wetland Tundra  
-7 - Barren lichen-moss  
-8 - Heath  
-9 - Maritime Upland Forest  
-10 - Maritime Forest Wetland  
-11 - Maritime Fen  
-12 - Maritime Alder Shrubland**
+**Legend:**
+
+**value** | **class name**
+---|---
+0 | Not Modeled  
+1 | Black Spruce  
+2 | White Spruce  
+3 | Deciduous  
+4 | Shrub Tundra  
+5 | Graminoid Tundra  
+6 | Wetland Tundra  
+7 | Barren lichen-moss  
+8 | Heath  
+9 | Maritime Upland Forest  
+10 | Maritime Forest Wetland  
+11 | Maritime Fen  
+12 | Maritime Alder Shrubland**
 
 ##Methods of production:
 ***
@@ -31,14 +34,14 @@ Due to specific models' input land cover input requirements, including the fact 
 
 [landcarbon_vegetation_maritime.py]: https://github.com/EarthScientist/alfresco_inputs/blob/master/vegetation/landcarbon_vegetation_maritime.py
 
-**  code:    ** [landcarbon_vegetation_maritime.py]
+**code:** [landcarbon_vegetation_maritime.py]
 
 4) **Mainland Alaska and Canada** - all remaining ecoregions excluding the Aleutian Islands  
 [alfresco_vegetation.py]:https://github.com/EarthScientist/alfresco_inputs/blob/master/vegetation/alfresco_vegetation.py
-**  code: ** [alfresco_vegetation.py]
+**code:** [alfresco_vegetation.py]
 
-*Note, legend values in these code bases do not represent final values in legend above.  
-Input data were processed in their native resolutions and only resampled to 1km in the final step where they were mosiacked together.
+**Note**, *legend values in these code bases do not represent final values in legend above.  
+Input data were processed in their native resolutions and only resampled to 1km in the final step where they were mosiacked together.*
 
 ### The Island of Kodiak reclassification
 This reclassification used the NLCD 2001 Alaska dataset as it's starting point and was a straight 1 to 1 or many to 1 reclassification approach.
@@ -90,7 +93,6 @@ Details of the reclassification methods can be seen in the supplied code linked 
  - if originally 41, 43, 51, 52, 71, 72, 90, 95 and now 10 or 11 and canopy cover <=20%, then = 11 - Maritime Fen  
 
 **Then correct misclassified areas that have been logged in the past:**
-
 if the pixels fall within the harvested masked area, then = 9 - Maritime Upland Forest
 
 
@@ -114,7 +116,7 @@ With the area of interest including sites in Western Canada, it was important to
 
 i. In the areas around south Sasketchewan there are large areas of prairie, which also coincides with the bread basket of Canada since their green revolution.  Since this area is not boreal forest and is a heavily human-will dictated environment (since it is mainly farms) it is not a good candidate to include in this classification.  **removed the Canada Ecozone "Prairie" and Canada Ecoregion "Interlake Plain" & "Boreal Transition"; both of which exist to the North of the excluded "Prairie" Canda Ecozone.  This was determined to be removed by examining the input NALCMS Land Cover map and inspecting visually that there were little to no trees in these areas.
 
-ii. To extent the "coastal" region beyond the southern extent of southeast Alaska, it was determined that the Canada Ecozone "Pacific Maritime" should be classed as coast to differentiate between coastal and non-coastal wetlands. Therefore this was added to the non-"Intermontane Boreal" classes from the Unified Ecoregions of Alaska map.
+ii. To extend the "coastal" region beyond the southern extent of southeast Alaska, it was determined that the Canada Ecozone "Pacific Maritime" should be classed as coast to differentiate between coastal and non-coastal wetlands. Therefore this was added to the non-"Intermontane Boreal" classes from the Unified Ecoregions of Alaska map.
 
 iii. The southern-most extent of the new coastal vs spruce bog layer is the international border between Canada and the U.S.
 
@@ -122,15 +124,16 @@ iv. The areas classified as "Boreal" on the Canada side include Ecozones of: Mon
 
 v. Included Areas to the North of the new "boreal" class on the Canada side include the Canada Ecozones of: Southern Arctic AND the Canada Ecoregions of: Wager Bay Plateau, Boothia Peninsula Plateau, Meta Incognita Peninsula, Central Ungava Peninsula, Foxe Basin Plain, Melville Peninsula Plateau, Baffin Island Uplands. *** Areas North of these locations are not considered for this layer.  
 
-treeline - This layer was created by rasterizing the Circumpolar Arctic Vegetation Map (CAVM, http://www.geobotany.uaf.edu/cavm/) and defining the treeline using the extent of this data.  The result is a boolean map where 0=no trees and 1=trees.
+[CAVM]:http://www.geobotany.uaf.edu/cavm/
 
-North Pacific Maritime -  This layer was created by rasterizing the Unified Ecoregions of Alaska data for the Northern Pacific Rainforest region and creating a layer which reclassifies this region as the North Pacific Maritime Region.
+**treeline** - This layer was created by rasterizing the Circumpolar Arctic Vegetation Map [CAVM] and defining the treeline using the extent of this data.  The result is a boolean map where 0=no trees and 1=trees.
+
+**North Pacific Maritime** -  This layer was created by rasterizing the Unified Ecoregions of Alaska data for the Northern Pacific Rainforest region and creating a layer which reclassifies this region as the North Pacific Maritime Region.
 
 
 The steps of reclassification of the NALCMS Land Cover Map are:
 
-1. Once the area of interest (AOI) is determined the input map was clipped to that extent.  The resulting classes in the  
-AOI are:
+1. Once the area of interest (AOI) was determined the input map was clipped to that extent.  The resulting classes in the AOI are:
         0.  out of bounds 
         1.  Temperate or sub-polar needleleaf forest
         2.  Sub-polar taiga needleleaf forest
@@ -163,11 +166,11 @@ These initial classes were reclassed as follows:
 
 5. The classes 12 "Sub-polar or polar grassland-lichen-moss" and 10 "Temperate or sub-polar grassland" are reclassified into graminoid tundra or grassland based on the growing_season_temperature layer.  Where pixels of class 10 or 12 with growing season temperature values of <6.5 are classified as graminoid tundra and the values >6.5 are classified as grassland.
 
-6. Then we reclassify the spruce class we created in step 1 into black or white spruce using the north_south layer.  If a spruce pixel is north facing it is classified as black spruce, and if the pixel is south facing then it is classified as white spruce.
+6. Then, we reclassify the spruce class we created in step 1 into black or white spruce using the north_south layer.  If a spruce pixel is north facing it is classified as black spruce, and if the pixel is south facing then it is classified as white spruce.
 
 7. Due to some deficiencies in the NALCMS map there are spruce trees on the North Slope of Alaska, which is known to not be factual.  Instead of simply reclassifying these data into a single class, we found that it would be better to run a focal analysis on the data that would convert the suspect cells into most common class in its surrounding 16 neighbors.  This allowed for a more realistic reclassification of these suspect pixels with the land cover classes that are in the surrounding area.  
 
-8. Using the north_pacific_maritime layer the pixels that are within that extent are reclassified as coastal rainforest in the output map.
+8. Using the north_pacific_maritime layer, the pixels that are within that extent are reclassified as coastal rainforest in the output map.
 
 9. Class 13 (Sub-polar or polar barren-lichen-moss) was reclassified into class 7 "Barren lichen-moss"
 
