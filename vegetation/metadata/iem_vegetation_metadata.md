@@ -1,4 +1,4 @@
-This 1km land cover dataset represent highly modified output originating from the Alaska portion of the North American Land Change Monitoring System (NALCMS) 2005 dataset as well as the National Land Cover Dataset 2001.  This model input dataset was developed solely for use in the ALFRESCO, TEM, GIPL and the combined Integrated Ecosystem Model landscape scale modeling studies and is not representative of any ground based observations.
+This 1km land cover dataset represents a highly modified output originating from the Alaska and Western Canada portion of the North American Land Change Monitoring System (NALCMS) 2005 dataset as well as the Alaska portion of the National Land Cover Dataset 2001. This model input dataset was developed solely for use in the ALFRESCO, TEM, GIPL and the combined Integrated Ecosystem Model landscape scale modeling studies and is not representative of any ground based observations.
 
 Original NLCD and NALCMS data, including legends: 
 [NALCMS data]:http://www.cec.org/Page.asp?PageID=924&ContentID=2819&AA_SiteLanguageID=1
@@ -114,15 +114,15 @@ access this ecozone/ecoregion shapefile data: [Canada Ecozones/Ecoregions]
 
 With the area of interest including sites in Western Canada, it was important to differentiate the coastal and inland boreal ecozones/regions in order to mimick what was done on the Alaska side.  To do this the Canada Ecozone/ecoregion data involved the following:
 
-i. In the areas around south Sasketchewan there are large areas of prairie, which also coincides with the bread basket of Canada since their green revolution.  Since this area is not boreal forest and is a heavily human-will dictated environment (since it is mainly farms) it is not a good candidate to include in this classification.  **removed the Canada Ecozone "Prairie" and Canada Ecoregion "Interlake Plain" & "Boreal Transition"; both of which exist to the North of the excluded "Prairie" Canda Ecozone.  This was determined to be removed by examining the input NALCMS Land Cover map and inspecting visually that there were little to no trees in these areas.
+1. In the areas around south Sasketchewan there are large areas of prairie, which also coincides with the bread basket of Canada since their green revolution.  Since this area is not boreal forest and is a heavily human-will dictated environment (since it is mainly farms) it is not a good candidate to include in this classification.  **removed the Canada Ecozone "Prairie" and Canada Ecoregion "Interlake Plain" & "Boreal Transition"; both of which exist to the North of the excluded "Prairie" Canda Ecozone.  This was determined to be removed by examining the input NALCMS Land Cover map and inspecting visually that there were little to no trees in these areas.
 
-ii. To extend the "coastal" region beyond the southern extent of southeast Alaska, it was determined that the Canada Ecozone "Pacific Maritime" should be classed as coast to differentiate between coastal and non-coastal wetlands. Therefore this was added to the non-"Intermontane Boreal" classes from the Unified Ecoregions of Alaska map.
+2. To extend the "coastal" region beyond the southern extent of southeast Alaska, it was determined that the Canada Ecozone "Pacific Maritime" should be classed as coast to differentiate between coastal and non-coastal wetlands. Therefore this was added to the non-"Intermontane Boreal" classes from the Unified Ecoregions of Alaska map.
 
-iii. The southern-most extent of the new coastal vs spruce bog layer is the international border between Canada and the U.S.
+3. The southern-most extent of the new coastal vs spruce bog layer is the international border between Canada and the U.S.
 
-iv. The areas classified as "Boreal" on the Canada side include Ecozones of: Montane Cordillera, Boreal Cordillera, Taiga Cordillera, Taiga Plain, Boreal Plain, Taiga Shield, Boreal Shield, Hudson Plain, Mixed Wood Plain, Atlantique Maritime, Hudson Plain, Arctic Cordillera.
+4. The areas classified as "Boreal" on the Canada side include Ecozones of: Montane Cordillera, Boreal Cordillera, Taiga Cordillera, Taiga Plain, Boreal Plain, Taiga Shield, Boreal Shield, Hudson Plain, Mixed Wood Plain, Atlantique Maritime, Hudson Plain, Arctic Cordillera.
 
-v. Included Areas to the North of the new "boreal" class on the Canada side include the Canada Ecozones of: Southern Arctic AND the Canada Ecoregions of: Wager Bay Plateau, Boothia Peninsula Plateau, Meta Incognita Peninsula, Central Ungava Peninsula, Foxe Basin Plain, Melville Peninsula Plateau, Baffin Island Uplands. *** Areas North of these locations are not considered for this layer.  
+5. Included Areas to the North of the new "boreal" class on the Canada side include the Canada Ecozones of: Southern Arctic AND the Canada Ecoregions of: Wager Bay Plateau, Boothia Peninsula Plateau, Meta Incognita Peninsula, Central Ungava Peninsula, Foxe Basin Plain, Melville Peninsula Plateau, Baffin Island Uplands. *** Areas North of these locations are not considered for this layer.  
 
 [CAVM]:http://www.geobotany.uaf.edu/cavm/
 
@@ -174,6 +174,5 @@ These initial classes were reclassed as follows:
 
 9. Class 13 (Sub-polar or polar barren-lichen-moss) was reclassified into class 7 "Barren lichen-moss"
 
-###end of Mainland Alaska and Canada process
 
 **All 4 regions were then mosaiced together at 1km spatial resolution into a single final map.**
