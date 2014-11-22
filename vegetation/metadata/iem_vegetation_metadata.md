@@ -22,11 +22,9 @@ Original NLCD and NALCMS data, including legends:
 9 | Maritime Upland Forest  
 10 | Maritime Forest Wetland  
 11 | Maritime Fen  
-12 | Maritime Alder Shrubland**
+12 | Maritime Alder Shrubland
 
 ![alt text](https://github.com/EarthScientist/alfresco_inputs/blob/master/vegetation/metadata/iem_vegetation_model_input_v0_4_map.png "IEM Vegatation Model Input Map Composition")
-
-
 
 ##Methods of production:
 ***
