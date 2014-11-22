@@ -84,7 +84,7 @@ Details of the reclassification methods can be seen in the supplied code linked 
 
 **NLCD Classes** |**NLCD descriptions** | **Final IEM class value**
 --- | --- | ---
-0,11,12,21,22,23,24,31 | ?,open water, perennial snow/ice, developed open space, developed low, developed med,developed high, barren | 0 - Not Modeled
+0,11,12,21,22,23,24,31 | nodata,open water, perennial snow/ice, developed open space, developed low, developed med,developed high, barren | 0 - Not Modeled
 42 | evergreen forest | 9 - Maritime Upland Forest or 11 - Maritime Fen  
 41, 43, 51, 52, 71, 72, 90, 95 | deciduous,mixed forest,dwarf shrub,shrub/scrub,grassland/herbaceous,sedge/herbaceous,woody wetland,emergent herbaceous wetland | 10 - Maritime Forest Wetland or 11 - Maritime Fen
 81,82 | pasture/hay, cultivated crops  | 12 - Maritime Alder Shrubland
