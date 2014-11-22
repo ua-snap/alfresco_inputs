@@ -26,14 +26,14 @@ Original NLCD and NALCMS data, including legends:
 Due to specific models' input land cover input requirements, including the fact that each model is primarily focused on different descriptive aspects of land cover (i.e. ALFRESCO considers land cover in respect to how it burns, TEM considers land cover in respect to how it cycles carbon through the system, and GIPL considers land cover with respect to its influence on its insulative qualities of the soil), 4 distinct subregions were delineated with unique set  of reclassification rules. Those regions are generally named below and also list the Unified Ecoregions of Alaska: 2001 (Nowacki et al 2001) Commoner names that make up each subregion.
 
 1) **The Island of Kodiak**  
-2) **Mountainous South Central Alaska** - Chugach-St Ellias Mountains  
-3) **Maritime influenced Southeast and South Central Alaska** - The Alexander Archipelado, Gulf of Alaska Coast  
+2) **Mountainous South Central Alaska and Canada** - Chugach-St Ellias Mountains  
+3) **Maritime influenced Southeast and South Central Alaska and Canada** - The Alexander Archipelado, Gulf of Alaska Coast  
 
 [landcarbon_vegetation_maritime.py]: https://github.com/EarthScientist/alfresco_inputs/blob/master/vegetation/landcarbon_vegetation_maritime.py
 
 **  code:    ** [landcarbon_vegetation_maritime.py]
 
-4) **Mainland Alaska** - all remaining ecoregions excluding the Aleutian Islands  
+4) **Mainland Alaska and Canada** - all remaining ecoregions excluding the Aleutian Islands  
 [alfresco_vegetation.py]:https://github.com/EarthScientist/alfresco_inputs/blob/master/vegetation/alfresco_vegetation.py
 **  code: ** [alfresco_vegetation.py]
 
@@ -56,7 +56,7 @@ This reclassification used the NLCD 2001 Alaska dataset as it's starting point a
 95 | emergent herbaceous wetland | 6 - Wetland Tundra
 
 
-### Mountainous South Central Alaska
+### Mountainous South Central Alaska and Canada
 This reclassification used the NLCD 2001 dataset as it's starting point and was a straight 1 to 1 or many to 1 reclassification approach.
 
 **NLCD Classes** |**NLCD descriptions** | **Final IEM class value**
@@ -70,7 +70,7 @@ This reclassification used the NLCD 2001 dataset as it's starting point and was 
 90 | woody wetland | 4 - Shrub Tundra  
 95 | emergent herbaceous wetland | 6 - Wetland Tundra
 
-### Maritime influenced Southeast and South Central Alaska
+### Maritime influenced Southeast and South Central Alaska and Canada
 This reclassification used the NLCD 2001 dataset as it's starting point for a 1 to 1 or many to 1 reclassification, but also utilized ancillary data including NLCD canopy cover (above and below 20% cover) as well as historical timber harvest regions for those areas within the Tongas National Forest. The canopy cover was used to distinguish between maritime *upland forest* vs maritime *fen* as well as between maritime *forest wetland* vs maritime *fen*. The timber harvest data was used to correctly classify historically harvested areas which were misclassified in the original NLCD data as a more accurate maritime upland forest.
 
 Details of the reclassification methods can be seen in the supplied code linked above. It generally described below.
@@ -94,7 +94,7 @@ Details of the reclassification methods can be seen in the supplied code linked 
 if the pixels fall within the harvested masked area, then = 9 - Maritime Upland Forest
 
 
-### Mainland Alaska
+### Mainland Alaska and Canada
 ___
 This reclassification used the NALCMS 2005 dataset as it's starting point for a 1 to 1 or many to 1 reclassification, but also utilized ancillary data including:
 
@@ -171,7 +171,7 @@ These initial classes were reclassed as follows:
 
 9. Class 13 (Sub-polar or polar barren-lichen-moss) was reclassified into class 7 "Barren lichen-moss"
 
-###end of Alaska Mainland process
+###end of Mainland Alaska and Canada process
 
 ###add info about areas in Canada
 
