@@ -1,6 +1,6 @@
 # # 
 # resample to 1km,mosaick with AKCAN extent, and clip/crop to desired output extent
-# Author: Michael Lindgren (malindgren@alaska.edu)
+# 	Author: Michael Lindgren (malindgren@alaska.edu)
 # # 
 
 def reclassify( rasterio_rst, reclass_list, output_filename, band=1, creation_options=dict() ):
@@ -82,14 +82,15 @@ if __name__ == '__main__':
 	import os, rasterio, fiona, shutil, glob
 	import numpy as np
 
-	input_dir = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Output_Data'
-	input_filename = os.path.join( input_dir, 'landcarbon_vegetation_modelinput_maritime_2001_v0_4.tif' )
-	output_resampled = os.path.join( input_dir, 'landcarbon_vegetation_modelinput_maritime_2001_v0_4_1km.tif' )
+	input_dir = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Input_Data'
+	output_dir = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Output_Data'
+	input_filename = os.path.join( output_dir, 'landcarbon_vegetation_modelinput_maritime_2001_v0_4.tif' )
+	output_resampled = os.path.join( output_dir, 'landcarbon_vegetation_modelinput_maritime_2001_v0_4_1km.tif' )
 
 	if os.path.exists( output_resampled ):
 		[ os.remove( i ) for i in glob.glob( output_resampled[:-3] + '*' ) ]
 
-	shutil.copy( os.path.join( input_dir, 'alfresco_model_vegetation_input_2005.tif' ), output_resampled )
+	shutil.copy( os.path.join( output_dir, 'alfresco_model_vegetation_input_2005.tif' ), output_resampled )
 	maritime = rasterio.open( output_resampled ) # something odd here but this hack works -- does nothing
 	with rasterio.open( output_resampled, 'r+' ) as maritime:
 		arr = maritime.read_band( 1 ).data
@@ -102,7 +103,7 @@ if __name__ == '__main__':
 	os.system( command )
 
 	maritime = rasterio.open( output_resampled )
-	alfresco = rasterio.open( os.path.join( input_dir, 'alfresco_model_vegetation_input_2005.tif' ) )
+	alfresco = rasterio.open( os.path.join( output_dir, 'alfresco_model_vegetation_input_2005.tif' ) )
 
 	# reclassify martime to a common classification
 	output_filename = output_resampled.replace( '.tif', '_iem_rcl.tif' )
@@ -121,21 +122,21 @@ if __name__ == '__main__':
 	maritime_rcl = rasterio.open( maritime_rcl.name )
 	
 	# generate an output colortable to pass to the new raster
-	qml = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Output_Data/qgis_styles/iem_vegetation_modelinput_qgis_style.qml'
+	qml = os.path.join( output_dir, 'qgis_styles', 'iem_vegetation_modelinput_qgis_style.qml' )
 	cmap = qml_to_ctable( qml )
 
-	maritime_mask_1k = rasterio.open( '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Input_Data/maritime/combined_mask_alaska_only_akcan_1km.tif' )
-	nlcd_saltwater_mask = rasterio.open( '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Input_Data/maritime/nlcd_2001_land_cover_maritime_saltwater_mask_akcan_1km.tif' )
-	maritime_mask_canada = rasterio.open( '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Input_Data/maritime/combined_mask_canada_only_akcan_1km.tif' )
-	temperate_rf_mask = rasterio.open( '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Input_Data/maritime/digitized_removal_mask_temperate_rainforest_maritime.tif' )
-	iem_mask = rasterio.open( '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Input_Data/maritime/iem_mask_1km_akcan.tif' )
-	akcan_mask = rasterio.open( '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Input_Data/alaska_canada/alfresco_vegetation_mask.tif' )
+	maritime_mask_1k = rasterio.open( input_dir, 'maritime', 'combined_mask_alaska_only_akcan_1km.tif' )
+	nlcd_saltwater_mask = rasterio.open( input_dir, 'maritime', 'nlcd_2001_land_cover_maritime_saltwater_mask_akcan_1km.tif' )
+	maritime_mask_canada = rasterio.open( input_dir, 'maritime', 'combined_mask_canada_only_akcan_1km.tif' )
+	temperate_rf_mask = rasterio.open( input_dir, 'maritime', 'digitized_removal_mask_temperate_rainforest_maritime.tif' )
+	iem_mask = rasterio.open( input_dir, 'maritime', 'iem_mask_1km_akcan.tif' )
+	akcan_mask = rasterio.open( input_dir, 'alaska_canada', 'alfresco_vegetation_mask.tif' )
 
 	# extend the extent of the martime data to match the extent of the alfresco data
 	# overlay 2 maps and fill-in where North Pacific Maritime (class 13)
 	meta = alfresco_rcl.meta
 	meta.update( compress='lzw', nodata=255 )
-	output_filename = os.path.join( input_dir, 'alfresco_vegetation_model_input.tif' )
+	output_filename = os.path.join( output_dir, 'alfresco_vegetation_model_input.tif' )
 	with rasterio.open( output_filename, 'w', **meta ) as out:
 		maritime_arr = maritime_rcl.read_band( 1 ).data
 		maritime_mask = maritime_mask_1k.read_band(1)
@@ -167,8 +168,8 @@ if __name__ == '__main__':
 		out.write_colormap( 1, cmap )
 
 	# crop to the IEM extent
-	iem_domain_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Input_Data/extents/AIEM_domain.shp'
-	output_filename = os.path.join( input_dir, 'iem_vegetation_model_input.tif' )
+	iem_domain_path = os.path.join( input_dir, 'extents', 'AIEM_domain.shp' )
+	output_filename = os.path.join( output_dir, 'iem_vegetation_model_input.tif' )
 	
 	command = 'gdalwarp -cutline ' + iem_domain_path + ' -crop_to_cutline ' + out.name + ' ' + output_filename
 	os.system( command )
