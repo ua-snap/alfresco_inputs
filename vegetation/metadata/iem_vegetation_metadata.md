@@ -177,4 +177,4 @@ These initial classes were reclassed as follows:
 9. Class 13 (Sub-polar or polar barren-lichen-moss) was reclassified into class 7 "Barren lichen-moss"
 
 
-**All 4 regions were then mosaiced together at 1km spatial resolution into a single final map.**
+**All 4 regions were then mosaicked together at 1km spatial resolution into a single final map.**
