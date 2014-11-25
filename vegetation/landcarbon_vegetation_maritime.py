@@ -78,11 +78,11 @@ if __name__ == '__main__':
 		lc_arr.fill_value = 255
 		lc_arr = lc_arr.filled()
 
-		## ##  --- seak reclass --- ## ##
 		# collapse initial undesired classes to noveg
 		lc_arr = lc.read_band( 1 )
 		lc_arr[ (lc_arr >= 0) & (lc_arr <= 31 ) ] = 1 # potentially 0 later on
 
+		## ##  --- seak reclass --- ## ##
 		# upland forest / fen
 		canopy = rasterio.open( input_paths[ 'cp01' ] ).read_band( 1 )
 		lc_arr[ (lc_arr == 42) & (canopy > 20) & (seak_mask == 1) ] = 8
