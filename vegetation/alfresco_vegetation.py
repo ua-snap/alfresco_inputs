@@ -120,8 +120,6 @@ if __name__ == '__main__':
 	coast_spruce_bog = rasterio.open( input_paths[ 'coast_spruce_bog' ] ).read_band( 1 )
 	lc_mod[ (lc_mod == 14) & (coast_spruce_bog == 2) ] = 9
 	lc_mod[ (lc_mod == 14) & (coast_spruce_bog != 2) ] = 6
-
-	# coastal wetland class to WETLAND TUNDRA or NO VEG based on the gs_temp (Average Growing Season Temperature) values
 	
 	# turn the placeholder class 8 (Temperate or sub-polar shrubland) into DECIDUOUS or SHRUB TUNDRA
 	# NOTE: may be best to do the treeline query here for these weird values <- (treeline == 1) etc
