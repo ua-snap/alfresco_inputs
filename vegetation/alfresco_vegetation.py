@@ -64,14 +64,30 @@ def replace_erroneous_treeline( lc2d, tl2d ):
 	if len( ind_zip ) == 0:
 		return lc2d
 	else:
-		index_groups = [ [(i-1,j-1), 
-						  (i-1, j+0), 
-						  (i-1,j+1), 
-						  (i+0,j-1), 
-						  (i+0,j+1), 
-						  (i+1,j-1), 
-						  (i+1,j+0), 
-						  (i+1,j+1)]
+		index_groups = [ [( i-2, j-2 ),
+						( i-2, j-1 ),
+						( i-2, j+0 ),
+						( i-2, j +1 ),
+						( i-2, j +2 ),
+						( i-1, j-2 ),
+						( i-1, j-1 ),
+						( i-1, j+0 ),
+						( i-1, j+1 ),
+						( i-1, j+2 ),
+						( i+0, j-2 ),
+						( i+0, j-1 ),
+						( i+0, j+1 ),
+						( i+0, j+2 ),
+						( i+1, j-2 ),
+						( i+1, j-1 ),
+						( i+1, j+0 ),
+						( i+1, j+1 ),
+						( i+1, j+2 ),
+						( i+2, j-2 ),
+						( i+2, j-1 ),
+						( i+2, j+0 ),
+						( i+2, j+1 ),
+						( i+2, j+2 ) ]
 						for i,j in ind_zip ]
 		
 		for count, group in enumerate( index_groups ):
@@ -85,6 +101,7 @@ def replace_erroneous_treeline( lc2d, tl2d ):
 				if new_val not in [1,2]:
 					lc2d[ ind_zip[ count ] ] = new_val
 		return replace_erroneous_treeline( lc2d, tl2d )
+
 
 if __name__ == '__main__':
 	import rasterio, fiona, os, sys
