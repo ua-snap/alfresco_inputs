@@ -53,7 +53,7 @@ def reclassify( rasterio_rst, reclass_list, output_filename, band=1, creation_op
 def replace_erroneous_treeline( lc2d, tl2d ):
 	''' replace values based on neighbors of offenders and a where condition 
 		arguments:
-			lc2d = 2d landcover array with erroneous values within
+			lc2d = 2d landcover array with erroneous values within0
 			tl2d = 2d treeline boolean array to subset the landcover array
 		returns:
 			2d numpy array with the erroneous values removed
@@ -67,8 +67,8 @@ def replace_erroneous_treeline( lc2d, tl2d ):
 		index_groups = [ [( i-2, j-2 ),
 						( i-2, j-1 ),
 						( i-2, j+0 ),
-						( i-2, j +1 ),
-						( i-2, j +2 ),
+						( i-2, j+1 ),
+						( i-2, j+2 ),
 						( i-1, j-2 ),
 						( i-1, j-1 ),
 						( i-1, j+0 ),
@@ -94,7 +94,7 @@ def replace_erroneous_treeline( lc2d, tl2d ):
 			cols = np.array( [j for i,j in group] )
 			rows = np.array( [i for i,j in group] )
 			vals = lc2d[ ( rows, cols ) ]
-			vals = vals[ (vals!=1) & (vals!=2) ] # (vals > 0) & 
+			vals = vals[ (vals > 0) & (vals!=1) & (vals!=2) ]  
 			if len(vals) != 0:
 				uniques, counts = np.unique( vals, return_counts = True )
 				new_val = uniques[ np.argmax( counts ) ]
@@ -112,7 +112,7 @@ if __name__ == '__main__':
 	input_dir = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Input_Data/alaska_canada'
 	output_dir = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Output_Data'
 	
-	output_veg = os.path.join( output_dir, 'alfresco_model_vegetation_input_2005.tif' )
+	output_veg = os.path.join( output_dir, 'alfresco_model_vegetation_input_2005_2.tif' )
 	meta_updater = dict( driver='GTiff', dtype=rasterio.uint8, compress='lzw', crs={'init':'epsg:3338'}, count=1, nodata=255 )
 
 	input_paths = {
@@ -174,6 +174,8 @@ if __name__ == '__main__':
 	# change the type ( byte ) and write it out
 	meta = lc.meta.copy()
 	meta.update( meta_updater )
+
+	# [not yet implemented] add in a colortable to the alfresco vegetation map
 
 	with rasterio.open( output_veg, 'w', **meta ) as out:
 		out.write_band( 1, lc_mod.astype( rasterio.uint8 ) )
