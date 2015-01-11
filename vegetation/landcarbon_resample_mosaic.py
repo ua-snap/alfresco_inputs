@@ -168,9 +168,10 @@ if __name__ == '__main__':
 		out.write_colormap( 1, cmap )
 
 	# crop to the IEM extent
-	iem_domain_path = os.path.join( input_dir, 'extents', 'AIEM_domain.shp' )
-	output_filename = os.path.join( output_dir, 'iem_vegetation_model_input.tif' )
+	iem_domain_path = os.path.join( input_dir, 'AIEM_domain.shp' )
+	output_filename = os.path.join( output_dir, 'iem_vegetation_model_input2.tif' )
 	
-	command = 'gdalwarp -cutline ' + iem_domain_path + ' -crop_to_cutline ' + out.name + ' ' + output_filename
+	# command = 'gdalwarp -cutline ' + iem_domain_path + ' -crop_to_cutline ' + out.name + ' ' + output_filename
+	command = 'gdalwarp -cutline ' + iem_domain_path + ' -crop_to_cutline ' + out_name + ' ' + output_filename
 	os.system( command )
 
