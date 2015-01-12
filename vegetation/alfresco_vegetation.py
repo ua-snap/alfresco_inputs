@@ -121,7 +121,7 @@ if __name__ == '__main__':
 	input_dir = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Input_Data/alaska_canada'
 	output_dir = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Output_Data'
 	
-	output_veg = os.path.join( output_dir, 'alfresco_model_vegetation_input_2005_7.tif' )
+	output_veg = os.path.join( output_dir, 'alfresco_model_vegetation_input_2005.tif' )
 	meta_updater = dict( driver='GTiff', dtype=rasterio.uint8, compress='lzw', crs={'init':'epsg:3338'}, count=1, nodata=255 )
 
 	input_paths = {
