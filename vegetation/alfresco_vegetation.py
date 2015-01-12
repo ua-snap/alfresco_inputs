@@ -163,8 +163,8 @@ if __name__ == '__main__':
 	lc_mod[ (lc_mod == 9) & (north_south == 2) ] = 1
 	lc_mod[ (lc_mod == 9) ] = 1 # convert low lying spruce leftover to black spruce
 
-	# [TEM] convert Barren to Heath
-	lc_mod[ (lc_mod == 16) ] = 9
+	# [TEM] convert Barren and Barren Lichen-moss to Heath
+	lc_mod[ (lc_mod == 16) | (lc_mod == 13) ] = 9
 
 	# reclassify erroneous spruce pixels with the most common values of its 16 neighbors
 	treeline = rasterio.open( input_paths[ 'treeline' ] ).read_band( 1 )
@@ -173,9 +173,6 @@ if __name__ == '__main__':
 	# temperate rainforest (seak) region delineation
 	temperate_rainforest = rasterio.open( input_paths[ 'NoPac' ] ).read_band( 1 )
 	lc_mod[ (lc_mod > 0) & (temperate_rainforest == 1) ] = 8
-
-	# conversion of the barren-lichen moss
-	lc_mod[ lc_mod == 13 ] = 7
 
 	# convert oob to 255
 	lc_mod = np.ma.masked_equal( lc_mod, 255, copy=True )
