@@ -15,8 +15,8 @@
 11 - Maritime Fen
 12 - Martime Alder Shrubland
 13 - NoPac Mar
+14 - Maritime Other Vegetation
 255 - Out-Of-Bounds
-
 
 
 
@@ -70,6 +70,7 @@
 9 - maritime forested wetland
 10 - maritime fen
 11 - maritime alder shrubland
+12 - maritime other veg
 255 - out of bounds
 
 
