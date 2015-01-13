@@ -1,4 +1,4 @@
-# # # # 
+	# # # # 
 # reclassify NLCD 2001 Landcover for the LandCarbon project 
 #	SEAK / SCAK / Kodiak Island Domains
 # 	Author: Michael Lindgren (malindgren@alaska.edu) 
@@ -65,7 +65,8 @@ if __name__ == '__main__':
 			'logged':os.path.join( input_dir, 'AKNPLCC_2ndGrowth.tif' ),
 			'seak_mask':os.path.join( input_dir, 'seak_aoi_akonly.tif' ),
 			'scak_mask':os.path.join( input_dir, 'scak_aoi_akonly.tif' ),
-			'kodiak_mask':os.path.join( input_dir, 'kodiak_aoi_akonly.tif' )
+			'kodiak_mask':os.path.join( input_dir, 'kodiak_aoi_akonly.tif' ),
+			'tnf_ct':os.path.join( input_dir, 'TNFCoverType_OtherVeg_Alpine_edited_akonly.tif' )
 	}
 
 	# # open mask arrays
@@ -99,6 +100,11 @@ if __name__ == '__main__':
 		logged = logged.filled()
 		lc_arr[ (logged == 1) & (seak_mask == 1) ] = 8
 		del logged
+
+		# reclass using tnf_covertype to other_veg (class1) alpine (class2) 
+		tnf_ct = rasterio.open( input_paths[ 'tnf_ct' ] ).read_band( 1 )
+		lc_arr[ tnf_ct == 1 ] = 7
+		lc_arr[ tnf_ct == 2 ] = 12
 
 		## ##  --- scak reclass --- ## ##
 		# alder
