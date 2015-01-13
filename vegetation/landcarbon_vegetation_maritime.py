@@ -1,4 +1,4 @@
-	# # # # 
+# # # # 
 # reclassify NLCD 2001 Landcover for the LandCarbon project 
 #	SEAK / SCAK / Kodiak Island Domains
 # 	Author: Michael Lindgren (malindgren@alaska.edu) 
