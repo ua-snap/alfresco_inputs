@@ -59,7 +59,6 @@ def reclassify( rasterio_rst, reclass_list, output_filename, band=1, creation_op
 			band_arr = np.ma.masked_where( band_arr == band_arr_fill_value, band_arr )
 		out_rst.write_band( band, band_arr )
 	return rasterio.open( output_filename )
-
 def replace_erroneous_treeline( lc2d, tl2d ):
 	''' replace values based on neighbors of offenders and a where condition 
 		arguments:
@@ -110,7 +109,44 @@ def replace_erroneous_treeline( lc2d, tl2d ):
 				new_val = uniques[ np.argmax( counts ) ]
 				lc2d[ ind_zip[ count ] ] = new_val
 		return replace_erroneous_treeline( lc2d, tl2d )
+def hex_to_rgb( hex ):
+	'''
+	borrowed and modified from Matthew Kramer's blog:
+		http://codingsimplicity.com/2012/08/08/python-hex-code-to-rgb-value/
 
+	function to take a hex value and convert it into an RGB(A) representation.
+
+	This is useful for generating color tables for a rasterio GTiff from a QGIS 
+	style file (qml).  Currently tested for the QGIS 2.0+ style version.
+
+	arguments:
+		hex = hex code as a string
+
+	returns:
+		a tuple of (r,g,b,a), where the alpha (a) is ALWAYS 1.  This may need
+		additional work in the future, but is good for the current purpose.
+		** we need to figure out how to calculate that alpha value correctly.
+
+	'''
+	hex = hex.lstrip( '#' )
+	hlen = len( hex )
+	rgb = [ int( hex[ i : i + hlen/3 ], 16 ) for i in range( 0, hlen, hlen/3 ) ]
+	rgb.insert( len( rgb ) + 1, 1 )
+	return rgb
+def qml_to_ctable( qml ):
+	'''
+	take a QGIS style file (.qml) and converts it into a 
+	rasterio-style GTiff color table for passing into a file.
+
+	arguments:
+		qml = path to a QGIS style file with .qml extension
+	returns:
+		dict of id as key and rgba as the values
+
+	'''
+	import xml.etree.cElementTree as ET
+	tree = ET.ElementTree( file=qml  )
+	return { int( i.get( 'value' ) ) : tuple( hex_to_rgb( i.get( 'color' ) ) ) for i in tree.iter( tag='paletteEntry' ) }
 
 if __name__ == '__main__':
 	import rasterio, fiona, os, sys
@@ -120,8 +156,9 @@ if __name__ == '__main__':
 	gs_value = 6.5
 	input_dir = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Input_Data/alaska_canada'
 	output_dir = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Output_Data'
+	styles_dir = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Input_Data/qgis_styles'
 	
-	output_veg = os.path.join( output_dir, 'alfresco_model_vegetation_input_2005.tif' )
+	output_veg = os.path.join( output_dir, 'alfresco_model_vegetation_input_2005_v0_5.tif' )
 	meta_updater = dict( driver='GTiff', dtype=rasterio.uint8, compress='lzw', crs={'init':'epsg:3338'}, count=1, nodata=255 )
 
 	input_paths = {
@@ -131,7 +168,8 @@ if __name__ == '__main__':
 		'gs_temp':os.path.join( input_dir, 'alfresco_tas_growingseason_1961_1990.tif' ),
 		'coast_spruce_bog':os.path.join( input_dir, 'alfresco_coastal_interior_domains.tif' ),
 		'treeline':os.path.join( input_dir, 'alfresco_treeline_cavm_derived.tif' ),
-		'NoPac':os.path.join( input_dir, 'alfresco_temperate_rainforest_domain.tif' )
+		'NoPac':os.path.join( input_dir, 'alfresco_temperate_rainforest_domain.tif' ),
+		'qml':os.path.join( styles_dir, 'alfresco_landcover_2005_colormap.qml' )
 	}
 
 	# collapse classes in the input landcover raster
@@ -164,7 +202,7 @@ if __name__ == '__main__':
 	lc_mod[ (lc_mod == 9) ] = 1 # convert low lying spruce leftover to black spruce
 
 	# [TEM] convert Barren and Barren Lichen-moss to Heath
-	lc_mod[ (lc_mod == 16) | (lc_mod == 13) ] = 9
+	lc_mod[ (lc_mod == 16) | (lc_mod == 13) ] = 7
 
 	# reclassify erroneous spruce pixels with the most common values of its 16 neighbors
 	treeline = rasterio.open( input_paths[ 'treeline' ] ).read_band( 1 )
@@ -181,7 +219,8 @@ if __name__ == '__main__':
 	meta = lc.meta.copy()
 	meta.update( meta_updater )
 
-	# [not yet implemented] add in a colortable to the alfresco vegetation map
+	ctable = qml_to_ctable( input_paths[ 'qml' ] ) # rasterio colormap dict r,g,b,a
 
 	with rasterio.open( output_veg, 'w', **meta ) as out:
 		out.write_band( 1, lc_mod.astype( rasterio.uint8 ) )
+		out.write_colormap( 1, ctable )
