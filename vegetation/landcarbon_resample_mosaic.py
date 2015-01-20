@@ -182,7 +182,7 @@ if __name__ == '__main__':
 		out.write_colormap( 1, cmap )
 
 	# crop to the IEM extent
-	iem_domain_path = os.path.join( '/workspace/Shared/Tech_Projects/Alaska_IEM/project_data', 'AIEM_domain.shp' )
+	iem_domain_path = os.path.join( input_dir, 'extents', 'AIEM_domain.shp' )
 	output_filename = os.path.join( output_dir, 'iem_vegetation_model_input_v0_5.tif' )
 	
 	# command = 'gdalwarp -cutline ' + iem_domain_path + ' -crop_to_cutline ' + out.name + ' ' + output_filename
