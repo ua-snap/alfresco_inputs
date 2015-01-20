@@ -166,13 +166,13 @@ if __name__ == '__main__':
 		akcan_arr[ ind ] = maritime_arr[ ind ]
 
 		# remove the Canadian IEM domain Temperate Rainforest and convert to Maritime Upland Forest
-		akcan_arr[ (maritime_mask_can_arr == 1) & (akcan_arr == 13) ] = 9
+		akcan_arr[ (maritime_mask_can_arr == 1) & (akcan_arr == 13) ] = 8 # 9
 		# remove the rest of the errant Temperate Rainforest and convert to no veg
 		akcan_arr[ (nlcd_sw_arr == 1) & (akcan_arr == 13) ] = 0
 		akcan_arr[ (temperate_rf_mask_arr == 1) & (akcan_arr == 13) ] = 0
 		
 		# any Temperate Rainforest in SEAK domain on Canada side convert to Maritime Upland Forest
-		akcan_arr[ (iem_mask_arr == 1) & (akcan_arr == 13) ] = 9
+		akcan_arr[ (iem_mask_arr == 1) & (akcan_arr == 13) ] = 8 # 9
 
 		# [not yet implemented] potentially find pixels in akcan that had veg data but do not in the new version
 		#  and replace their value with their neighbors that are not nodata.
@@ -186,6 +186,6 @@ if __name__ == '__main__':
 	output_filename = os.path.join( output_dir, 'iem_vegetation_model_input_v0_5.tif' )
 	
 	# command = 'gdalwarp -cutline ' + iem_domain_path + ' -crop_to_cutline ' + out.name + ' ' + output_filename
-	command = 'gdalwarp -overwrite -cutline ' + iem_domain_path + ' -crop_to_cutline ' + out.name + ' ' + output_filename
+	command = 'gdalwarp -overwrite -cutline ' + iem_domain_path + ' -crop_to_cutline -tr 1000 1000 -co "COMPRESS=LZW" -t_srs EPSG:3338 ' + out.name + ' ' + output_filename
 	os.system( command )
 
