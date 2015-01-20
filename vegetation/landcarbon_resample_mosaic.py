@@ -107,13 +107,13 @@ if __name__ == '__main__':
 
 	# reclassify martime to a common classification
 	output_filename = output_resampled.replace( '.tif', '_iem_rcl.tif' )
-	reclass_list = [[11, 12, 12], [10, 11, 11], [9, 10, 10], [8, 9, 9], [7, 8, 8], [1, 2, 0]]
+	reclass_list = [[1, 2, 0]]
 	maritime_rcl = reclassify( maritime, reclass_list, output_filename, band=1, creation_options={'compress':'lzw'} )
 	maritime_rcl.close()
 
 	# reclassify alfresco veg to a common classification
 	output_filename = alfresco.name.replace( '.tif', '_iem_rcl.tif' )
-	reclass_list = [[8,9,13],[9,10,8]]
+	reclass_list = [[8,9,13]] # ,[9,10,8]
 	alfresco_rcl = reclassify( alfresco, reclass_list, output_filename, band=1, creation_options={'compress':'lzw'} )
 	alfresco_rcl.close() # close it since there is no flush in rasterio
 	alfresco_rcl = rasterio.open( output_filename ) # and reopen
@@ -122,8 +122,8 @@ if __name__ == '__main__':
 	maritime_rcl = rasterio.open( maritime_rcl.name )
 	
 	# generate an output colortable to pass to the new raster
-	qml = os.path.join( output_dir, 'qgis_styles', 'iem_vegetation_modelinput_qgis_style.qml' )
-	cmap = qml_to_ctable( qml )
+	# qml = os.path.join( output_dir, 'qgis_styles', 'iem_vegetation_modelinput_qgis_style.qml' )
+	# cmap = qml_to_ctable( qml )
 
 	maritime_mask_1k = rasterio.open( input_dir, 'maritime', 'combined_mask_alaska_only_akcan_1km.tif' )
 	nlcd_saltwater_mask = rasterio.open( input_dir, 'maritime', 'nlcd_2001_land_cover_maritime_saltwater_mask_akcan_1km.tif' )
@@ -165,11 +165,11 @@ if __name__ == '__main__':
 		# akcan_arr[ akcan_mask_arr == 0 ]
 		
 		out.write_band( 1, akcan_arr )
-		out.write_colormap( 1, cmap )
+		# out.write_colormap( 1, cmap )
 
 	# crop to the IEM extent
 	iem_domain_path = os.path.join( input_dir, 'AIEM_domain.shp' )
-	output_filename = os.path.join( output_dir, 'iem_vegetation_model_input2.tif' )
+	output_filename = os.path.join( output_dir, 'iem_vegetation_model_input_v0_5.tif' )
 	
 	# command = 'gdalwarp -cutline ' + iem_domain_path + ' -crop_to_cutline ' + out.name + ' ' + output_filename
 	command = 'gdalwarp -cutline ' + iem_domain_path + ' -crop_to_cutline ' + out_name + ' ' + output_filename
