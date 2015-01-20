@@ -8,16 +8,14 @@
 4 - Shrub Tundra 
 5 - Graminoid Tundra 
 6 - Wetland Tundra 
-7 - Barren lichen-moss 
-8 - Heath
-9 - Maritime Upland Forest
-10 - Maritime Forested Wetland
-11 - Maritime Fen
-12 - Martime Alder Shrubland
+7 - Heath
+8 - Maritime Upland Forest
+9 - Maritime Forested Wetland
+10 - Maritime Fen
+11 - Martime Alder Shrubland
+12 - Maritime Other Vegetation
 13 - NoPac Mar
-14 - Maritime Other Vegetation
 255 - Out-Of-Bounds
-
 
 
 # NALCMS (original) BASE LEGEND (from metadata):

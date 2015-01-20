@@ -186,6 +186,6 @@ if __name__ == '__main__':
 	output_filename = os.path.join( output_dir, 'iem_vegetation_model_input_v0_5.tif' )
 	
 	# command = 'gdalwarp -cutline ' + iem_domain_path + ' -crop_to_cutline ' + out.name + ' ' + output_filename
-	command = 'gdalwarp -cutline ' + iem_domain_path + ' -crop_to_cutline ' + out.name + ' ' + output_filename
+	command = 'gdalwarp -overwrite -cutline ' + iem_domain_path + ' -crop_to_cutline ' + out.name + ' ' + output_filename
 	os.system( command )
 
