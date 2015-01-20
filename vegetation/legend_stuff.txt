@@ -87,3 +87,17 @@
 8 - Temperate Rainforest
 9 - Heath
 255 - out of bounds
+
+
+
+# new akcan classification v0_5
+0 - Not Modeled
+1 - Black Spruce
+2 - White Spruce
+3 - Deciduous
+4 - Shrub Tundra
+5 - Graminoid Tundra
+6 - Wetland Tundra
+7 - Heath
+8 - Temperate Rainforest
+255 - out of bounds

@@ -41,7 +41,7 @@ def qml_to_ctable( qml ):
 	'''
 	import xml.etree.cElementTree as ET
 	tree = ET.ElementTree( file=qml  )
-	return { int( i.get( 'value' ) ) : tuple( hex_to_rgb( i.get( 'color' ) ) ) for i in tree.iter( tag='item' ) }
+	return { int( i.get( 'value' ) ) : tuple( hex_to_rgb( i.get( 'color' ) ) ) for i in tree.iter( tag='paletteEntry' ) }
 
 if __name__ == '__main__':
 	import os, rasterio, fiona, shutil
@@ -50,7 +50,7 @@ if __name__ == '__main__':
 	import numpy as np
 
 	# # some initial setup
-	version_num = 'v0_4'
+	version_num = 'v0_5'
 	input_dir = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Input_Data/maritime'
 	output_dir = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Vegetation/Output_Data'
 	qml_style = os.path.join( output_dir, 'qgis_styles','landcarbon_modeled_vegetation_2001_style.qml' )
@@ -60,13 +60,13 @@ if __name__ == '__main__':
 	meta_updater = dict( driver='GTiff', dtype=rasterio.uint8, compress='lzw', crs={'init':'epsg:3338'}, count=1, nodata=255 )
 	
 	input_paths = { 
-			'lc01':os.path.join( input_dir, 'nlcd_2001_land_cover_maritime.tif' ),
+			'lc01':os.path.join( input_dir, 'nlcd_2001_land_cover_maritime2.tif' ),
 			'cp01':os.path.join( input_dir, 'nlcd_2001_canopy_cover_maritime.tif' ),
 			'logged':os.path.join( input_dir, 'AKNPLCC_2ndGrowth.tif' ),
 			'seak_mask':os.path.join( input_dir, 'seak_aoi_akonly.tif' ),
 			'scak_mask':os.path.join( input_dir, 'scak_aoi_akonly.tif' ),
 			'kodiak_mask':os.path.join( input_dir, 'kodiak_aoi_akonly.tif' ),
-			'tnf_ct':os.path.join( input_dir, 'TNFCoverType_OtherVeg_Alpine_edited_akonly.tif' )
+			'tnf_ct':os.path.join( input_dir, 'tnfcovertype_otherveg_heath_akcan_1km.tif' )
 	}
 
 	# # open mask arrays
@@ -148,13 +148,17 @@ if __name__ == '__main__':
 
 		# fill nodata with 255 and set it as a masked array before writing to disk
 		lc_arr = lc_arr.filled()
-		lc_arr = np.ma.masked_array( lc_arr, combined_mask, fill_value=255, copy=True )
+		lc_arr[ combined_mask == 1 ] = 255
+		lc_arr = np.ma.masked_values( lc_arr, 255, copy=True )
+
+		# convert all leftover pixels to no_veg ( ~100 ).
+		lc_arr[ (lc_arr > 12) & (lc_arr < 255) ] = 1 
 
 		# # write to disk
 		meta = lc.meta
 		meta.update( meta_updater )
 		with rasterio.open( output_filename, mode='w', **meta ) as output:
-			ctable = qml_to_ctable( qml_style ) # rasterio colormap dict r,g,b,a
+			# ctable = qml_to_ctable( qml_style ) # rasterio colormap dict r,g,b,a
 			output.write_band( 1, lc_arr.filled() )
-			output.write_colormap( 1, ctable )
+			# output.write_colormap( 1, ctable )
 
