@@ -123,8 +123,7 @@ North Pacific Maritime -  This layer was created by rasterizing the Unified Ecor
 
 The steps of reclassification of the NALCMS Land Cover Map are:
 
-1. Once the area of interest (AOI) is determined the input map was clipped to that extent.  The resulting classes in the  
-AOI are:
+1. Once the area of interest (AOI) was determined the input map was clipped to that extent.  The resulting classes in the AOI are:
         0.  out of bounds 
         1.  Temperate or sub-polar needleleaf forest
         2.  Sub-polar taiga needleleaf forest
