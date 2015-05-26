@@ -3,18 +3,6 @@ http://ckan.snap.uaf.edu/dataset/land-cover-v0-4
 
 This 1km land cover dataset represent highly modified output originating from the Alaska portion of the North American Land Change Monitoring System (NALCMS) 2005 dataset as well as the National Land Cover Dataset 2001.  This model input dataset was developed solely for use in the ALFRESCO, TEM, GIPL and the combined Integrated Ecosystem Model landscape scale modeling studies and is not representative of any ground based observations.
 
-<<<<<<< HEAD
-Original NLCD and NALCMS data, including legends: 
-[NALCMS data]:http://www.cec.org/Page.asp?PageID=924&ContentID=2819&AA_SiteLanguageID=1
-[NALCMS data]  
-[NLCD 2001]:http://www.mrlc.gov/nlcd01_data.php
-[NLCD 2001]
-
-**Legend:**
-
-**value** | **class name**
----|---
-=======
 **Original landcover data, including legends:**  
 [NALCMS data](http://www.cec.org/Page.asp?PageID=924&ContentID=2819&AA_SiteLanguageID=1)  
 [NLCD 2001](http://www.mrlc.gov/nlcd01_data.php)
@@ -24,7 +12,6 @@ Original NLCD and NALCMS data, including legends:
 
 | **value** | **class name** |
 |---|---|
->>>>>>> a6c2a7441ae7c0bd54d80d1dac4adcf8382b3e4f
 0 | Not Modeled  
 1 | Black Spruce Forest  
 2 | White Spruce Forest  
@@ -39,23 +26,6 @@ Original NLCD and NALCMS data, including legends:
 11 | Maritime Fen  
 12 | Maritime Alder Shrubland**
 
-<<<<<<< HEAD
-##Methods of production:
-***
-Due to specific models' land cover input requirements, including the fact that each model is primarily focused on different descriptive aspects of land cover (i.e. ALFRESCO considers land cover in respect to how it burns, TEM considers land cover in respect to how it cycles carbon through the system, and GIPL considers land cover with respect to its influence on the insulative qualities of the soil), 4 distinct subregions were delineated with unique sets of reclassification rules. Those regions are generally named below and also list the Unified Ecoregions of Alaska: 2001 (Nowacki et al 2001) Commoner names that make up each subregion.
-
-1) **Kodiak Island**  
-2) **Mountainous South Central Alaska and Canada** - Chugach-St Elias Mountains
-3) **Maritime influenced Southeast and South Central Alaska and Canada** - The Alexander Archipelago, Gulf of Alaska Coast, Boundary Range
-
-[landcarbon_vegetation_maritime.py]: https://github.com/EarthScientist/alfresco_inputs/blob/master/vegetation/landcarbon_vegetation_maritime.py
-
-**code for 1,2,3:** [landcarbon_vegetation_maritime.py]
-
-4) **Mainland Alaska and Canada** - all remaining ecoregions excluding the Aleutian Islands  
-[alfresco_vegetation.py]:https://github.com/EarthScientist/alfresco_inputs/blob/master/vegetation/alfresco_vegetation.py
-**code for 4:** [alfresco_vegetation.py]
-=======
 ###Methods of production:
 Due to specific models' land cover input requirements, including the fact that each model is primarily focused on different descriptive aspects of land cover (i.e. ALFRESCO considers land cover in respect to how it burns, TEM considers land cover in respect to how it cycles carbon through the system, and GIPL considers land cover with respect to its influence on the insulative qualities of the soil), 4 distinct subregions were delineated with unique sets of reclassification rules. Those regions are generally named below and also list the Unified Ecoregions of Alaska: 2001 (Nowacki et al 2001) Commoner names that make up each subregion.
 
@@ -70,23 +40,15 @@ Due to specific models' land cover input requirements, including the fact that e
 4) **Mainland Alaska and Canada** - all remaining ecoregions excluding the Aleutian Islands  
 
 **code for 4:** [alfresco_vegetation.py](https://github.com/EarthScientist/alfresco_inputs/blob/master/vegetation/alfresco_vegetation.py)
->>>>>>> a6c2a7441ae7c0bd54d80d1dac4adcf8382b3e4f
 
 **Note**, *legend values in these code bases do not represent final values in legend above.  
 Input data were processed in their native resolutions and only resampled to 1km in the final step where they were mosiacked together.*
 
 ### Kodiak Island reclassification
-<<<<<<< HEAD
-This reclassification used the National Land Cover Database (NLCD) 2001 for Alaska  as it's starting point and was a straight 1 to 1 or many to 1 reclassification approach.The Kodiak Island Existing Vegetation Type, circa 2000 map for the Kodiak Archipelago produced by Michael Fleming (http://akevt.gina.alaska.edu/) was used to help inform the NLCD reclassification into the IEM land cover types.
-
-**NLCD Classes** |**NLCD descriptions** | **Final IEM class value**
---- | --- | ---
-=======
 This reclassification used the National Land Cover Database (NLCD) 2001 for Alaska as its starting point and was a straight 1 to 1 or many to 1 reclassification approach.The Kodiak Island Existing Vegetation Type, circa 2000 map for the Kodiak Archipelago produced by Michael Fleming (http://akevt.gina.alaska.edu/) was used to help inform the NLCD reclassification into the IEM land cover types.
 
 **NLCD Classes** |**NLCD descriptions** | **Final IEM class value**  
 --- | --- | ---  
->>>>>>> a6c2a7441ae7c0bd54d80d1dac4adcf8382b3e4f
 11, 12, 22, 23, 31 | open water, perennial snow/ice, developed low, developed med, barren | 0 - Not Modeled  
 41 | deciduous forest | 3 - Deciduous  Forest
 42 | evergreen forest | 9 - Maritime Upland Forest  
@@ -96,17 +58,10 @@ This reclassification used the National Land Cover Database (NLCD) 2001 for Alas
 72,95 | sedge/herbaceous, emergent herbaceous wetland | 6 - Wetland Tundra  
 
 ### Mountainous South Central Alaska and Canada
-<<<<<<< HEAD
-This reclassification used the NLCD 2001 dataset as it's starting point and was a straight 1 to 1 or many to 1 reclassification approach. .  Existing Vegetation Type, circa 2000 map for the region around Chitina produced by Michael Fleming (http://akevt.gina.alaska.edu/) was used to help develop the NLCD reclassification.
-
-**NLCD Classes** |**NLCD descriptions** | **Final IEM class value**
---- | --- | ---
-=======
 This reclassification used the NLCD 2001 dataset as its starting point and was a straight 1 to 1 or many to 1 reclassification approach. .  Existing Vegetation Type, circa 2000 map for the region around Chitina produced by Michael Fleming (http://akevt.gina.alaska.edu/) was used to help develop the NLCD reclassification.
 
 **NLCD Classes** |**NLCD descriptions** | **Final IEM class value**  
 --- | --- | ---  
->>>>>>> a6c2a7441ae7c0bd54d80d1dac4adcf8382b3e4f
 0, 11, 12, 21, 22, 23, 24, 31 | nodata, open water, perennial snow/ice, developed open space, developed low, developed med,developed high, barren | 0 - Not Modeled
 41 | deciduous forest | 12 - Maritime Alder Shrubland  
 42 | evergreen forest | 2 - White Spruce Forest  
@@ -116,17 +71,6 @@ This reclassification used the NLCD 2001 dataset as its starting point and was a
 95 | emergent herbaceous wetland | 6 - Wetland Tundra
 
 ### Maritime influenced Southeast and South Central Alaska and Canada
-<<<<<<< HEAD
-This reclassification used the NLCD 2001 dataset as it's starting point for a 1 to 1 or many to 1 reclassification, but also utilized ancillary data including NLCD percent canopy cover (above and below 20% cover) and historical timber harvest regions for those areas within the Tongas National Forest. The percent canopy cover was used to distinguish between maritime *upland forest* vs maritime *fen* as well as between maritime *forested wetland* vs maritime *fen*. The timber harvest dataset covers the region between Yakataga and Dixon Entrance.  Because young-growth forests are not easily discernable in the NLCD and often misclassified, timber harvest extents were used to identify areas of logged maritme upland forest.
-
-The West Copper River Delta Landscape Assessment (2003, updated 2007) was used to help develop the NLCD reclassification for the Maritime South Central region. The USDA Forest Service Tongass National Forest’s cover type map was used to help develop the NLCD reclassification for the Maritime Southeast region.
-
-Details of the reclassification methods can be seen in the supplied code linked above. It is generally described below.
-
-**NLCD Classes** |**NLCD descriptions** | **Final IEM class value**
---- | --- | ---
-0,11,12,21,22,23,24,31 | ?,open water, perennial snow/ice, developed open space, developed low, developed med,developed high, barren | 0 - Not Modeled
-=======
 This reclassification used the NLCD 2001 dataset as its starting point for a 1 to 1 or many to 1 reclassification, but also utilized ancillary data including NLCD percent canopy cover (above and below 20% cover) and historical timber harvest regions for those areas within the Tongas National Forest. The percent canopy cover was used to distinguish between maritime *upland forest* vs maritime *fen* as well as between maritime *forested wetland* vs maritime *fen*. The timber harvest dataset covers the region between Yakataga and Dixon Entrance.  Because young-growth forests are not easily discernable in the NLCD and often misclassified, timber harvest extents were used to identify areas of logged maritme upland forest.
 
 The West Copper River Delta Landscape Assessment (2003, updated 2007) was used to help develop the NLCD reclassification for the Maritime South Central region. The USDA Forest Service Tongass National Forest’s cover type map was used to help develop the NLCD reclassification for the Maritime Southeast region.
@@ -136,7 +80,6 @@ Details of the reclassification methods can be seen in the supplied code linked 
 **NLCD Classes** |**NLCD descriptions** | **Final IEM class value**  
 --- | --- | ---  
 0,11,12,21,22,23,24,31 | no data, open water, perennial snow/ice, developed open space, developed low, developed med,developed high, barren | 0 - Not Modeled
->>>>>>> a6c2a7441ae7c0bd54d80d1dac4adcf8382b3e4f
 42 | evergreen forest | 9 - Maritime Upland Forest or 11 - Maritime Fen  
 41, 43, 51, 52, 71, 72, 90, 95 | deciduous,mixed forest,dwarf shrub,shrub/scrub,grassland/herbaceous,sedge/herbaceous,woody wetland,emergent herbaceous wetland | 10 - Maritime Forested Wetland or 11 - Maritime Fen
 81,82 | pasture/hay, cultivated crops  | 12 - Maritime Alder Shrubland
@@ -150,19 +93,11 @@ Details of the reclassification methods can be seen in the supplied code linked 
 
 **Then correct misclassified areas that have been logged in the past:**
 if the pixels fall within the harvested masked area, then = 9 - Maritime Upland Forest
-<<<<<<< HEAD
-
-
-### Mainland Alaska and Canada
-___
-This reclassification used the NALCMS 2005 dataset as it's starting point for a 1 to 1 or many to 1 reclassification, but also utilized ancillary data including:
-=======
 
 
 ### Mainland Alaska and Canada
 ___
 This reclassification used the NALCMS 2005 dataset as its starting point for a 1 to 1 or many to 1 reclassification, but also utilized ancillary data including:
->>>>>>> a6c2a7441ae7c0bd54d80d1dac4adcf8382b3e4f
 
 **north south** - this layer is derived from an aspect calculation (in degrees) of the PRISM 2km Digital Elevation Model (DEM). It constitutes a reclassification into 3 classes: North, South, Water.  The classification scheme used to reclassify the aspect map is as follows: south = greater than 90 degrees and less than 301 degrees (value=1). north is all else (value=2), water (value=999). It is important to note here that when calculating aspect there are situations that arise where there is no slope and therefore no aspect.  In these situations the flat areas were reclassified as NORTH (2) unless they are a body of water.  Water bodies were extracted from the NALCMS Landcover Data and those areas that were both flat and waterbodies were reclassed as water (999).
 
@@ -172,14 +107,8 @@ This reclassification used the NALCMS 2005 dataset as its starting point for a 1
 
 **Unified Ecoregions of Alaska** features include 2 classes of the "LEVEL_2" ecoregions in that dataset where Intermontane Boreal was classed as 2 and all other ecoregions (all coastal) was classed as 1.  This gives a differentiation between the wetlands classes that fall into each of these two reclassified regions, allowing for the creation of an Spruce Bog class from the "wetland" class in the NALCMS 2005 Land Cover Classification.  
 
-<<<<<<< HEAD
-**Ecozones/Ecoregions of Canada**
-[Canada Ecozones/Ecoregions]:http://sis.agr.gc.ca/cansis/nsdb/ecostrat/gis_data.html
-access this ecozone/ecoregion shapefile data: [Canada Ecozones/Ecoregions]
-=======
 **Ecozones/Ecoregions of Canada**  
 access this ecozone/ecoregion shapefile data: [Canada Ecozones/Ecoregions](http://sis.agr.gc.ca/cansis/nsdb/ecostrat/gis_data.html)
->>>>>>> a6c2a7441ae7c0bd54d80d1dac4adcf8382b3e4f
 
 With the area of interest including sites in Western Canada, it was important to differentiate the coastal and inland boreal ecozones/regions in order to mimick what was done on the Alaska side.  To do this the Canada Ecozone/ecoregion data involved the following:
 
@@ -193,39 +122,14 @@ iv. The areas classified as "Boreal" on the Canada side include Ecozones of: Mon
 
 v. Included Areas to the North of the new "boreal" class on the Canada side include the Canada Ecozones of: Southern Arctic AND the Canada Ecoregions of: Wager Bay Plateau, Boothia Peninsula Plateau, Meta Incognita Peninsula, Central Ungava Peninsula, Foxe Basin Plain, Melville Peninsula Plateau, Baffin Island Uplands. *** Areas North of these locations are not considered for this layer.  
 
-<<<<<<< HEAD
-[CAVM]:http://www.geobotany.uaf.edu/cavm/
-
-**treeline** - This layer was created by rasterizing the Circumpolar Arctic Vegetation Map [CAVM] and defining the treeline using the extent of this data.  The result is a boolean map where 0=no trees and 1=trees.
-
-=======
 **treeline** - This layer was created by rasterizing the Circumpolar Arctic Vegetation Map [CAVM](http://www.geobotany.uaf.edu/cavm/) and defining the treeline using the extent of this data.  The result is a boolean map where 0=no trees and 1=trees.
 
->>>>>>> a6c2a7441ae7c0bd54d80d1dac4adcf8382b3e4f
 **North Pacific Maritime** -  This layer was created by rasterizing the Unified Ecoregions of Alaska data for the Northern Pacific Rainforest region and creating a layer which reclassifies this region as the North Pacific Maritime Region.
 
 
 The steps of reclassification of the NALCMS Land Cover Map are:
 
 1. Once the area of interest (AOI) was determined the input map was clipped to that extent.  The resulting classes in the AOI are:
-<<<<<<< HEAD
-        0.  out of bounds 
-        1.  Temperate or sub-polar needleleaf forest
-        2.  Sub-polar taiga needleleaf forest
-        5.  Temperate or sub-polar broadleaf deciduous
-        6.  Mixed Forest
-        8.  Temperate or sub-polar shrubland
-        10. Temperate or sub-polar grassland
-        11. Sub-polar or polar shrubland-lichen-moss
-        12. Sub-polar or polar grassland-lichen-moss 
-        13. Sub-polar or polar barren-lichen-moss
-        14. Wetland
-        15. Cropland
-        16. Barren Lands
-        17. Urban and Built-up
-        18. Water
-        19. Snow and Ice
-=======
 
 | **value** | **NALCMS type** | 
 |---|---|
@@ -245,7 +149,6 @@ The steps of reclassification of the NALCMS Land Cover Map are:
 17 | Urban and Built-up
 18 | Water
 19 | Snow and Ice
->>>>>>> a6c2a7441ae7c0bd54d80d1dac4adcf8382b3e4f
 
     These initial classes were reclassed as follows:
     * classes [ 15, 17, 18, 19 ] were reclassed as no vegetation.
