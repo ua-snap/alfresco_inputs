@@ -95,7 +95,7 @@ def xyz_to_grid( x, y, z, grid, method='cubic', output_dtype=np.float32 ):
 	zi = griddata( (x, y), z, grid, method=method )
 	zi = np.flipud( zi.astype( output_dtype ) )
 	return zi
-def crop_to_bounds( rasterio_rst, bounds, output_filename, mask=None, mask_value=None ):
+def crop_to_bounds2( rasterio_rst, bounds, output_filename, mask=None, mask_value=None ):
 	'''
 	take a rasterio raster object and crop it to a smaller bounding box
 	masking is supported where masked values are 0 and unmasked values are 1
@@ -140,6 +140,11 @@ def crop_to_bounds( rasterio_rst, bounds, output_filename, mask=None, mask_value
 	with rasterio.open( output_filename, 'w', **meta ) as out:
 		out.write_band( 1, arr )
 	return output_filename
+def crop_to_bounds( rasterio_rst, bounds ):
+	''' crop a raster by a window made from bounds of another domain '''
+	window = rasterio_rst.window( *bounds )
+	return rasterio_rst.read( 1, window=window )
+
 
 if __name__ == '__main__':
 	import os, rasterio, glob, fiona
@@ -209,11 +214,15 @@ if __name__ == '__main__':
 	yi = np.linspace( ymin, ymax, rows )
 	xi, yi = np.meshgrid( xi, yi )
 
+	akcan_path = os.path.join( base_path, 'cru_ts20', 'akcan' )
+	if not os.path.exists( akcan_path ):
+		os.makedirs( akcan_path )
+
 	# build some args	
 	months = ['01','02','03','04','05','06','07','08','09','10','11','12']
 	output_filenames = [ os.path.join( akcan_path, 'hur_cru_cl20_akcan_'+month+'_1961_1990.tif' ) for month in months ]
 
-	def interpolate_akcan( x, y, z, grid, expanded_meta, template_rst, output_filename, mask=None, mask_value=None, method='cubic', output_dtype=np.float32 ):
+	def interpolate_akcan( x, y, z, grid, template_rst, output_filename, mask=None, mask_value=None, method='cubic', output_dtype=np.float32 ):
 		'''
 		interpolate across the alaska canada domains and crop / mask to that extent
 		'''	
@@ -225,12 +234,12 @@ if __name__ == '__main__':
 		cru_interpolated = rasterio.open( '', mode='w', **expanded_meta )
 		cru_interpolated.write_band( 1, cru_interp )
 
-		akcan = crop_to_bounds( cru_interpolated, template_rst.bounds, output_filename, mask, mask_value )
+		akcan = crop_to_bounds( cru_interpolated, template_rst.bounds )
 		
 		meta = template_rst.meta
 		meta.update( compress='lzw' )
 		with rasterio.open( output_filename, 'w', **meta ) as out:
-			mask = template_rst.read_mask()
+			mask = template_rst.read_masks( 1 )
 			akcan[ mask == 0 ] = meta[ 'nodata' ]
 			out.write_band( 1, akcan )
 		return output_filename
@@ -240,7 +249,7 @@ if __name__ == '__main__':
 
 	# run it in parallel
 	from pathos import multiprocessing as mp
-	args_list = [ { 'x':x, 'y':y, 'z':cru_df_akcan[ month ], 'grid':(xi,yi), 'expanded_meta':expanded_akcan_meta, 'template_rst':akcan_template, 'output_filename':out_fn } for month, out_fn in zip( months, output_filenames ) ]
+	args_list = [ { 'x':x, 'y':y, 'z':np.array(cru_df_akcan[ month ]), 'grid':(xi,yi), 'template_rst':akcan_template, 'output_filename':out_fn } for month, out_fn in zip( months, output_filenames ) ]
 	pool = mp.Pool( 10 )
 	pool.map( run, args_list )
 	pool.close()
@@ -255,9 +264,6 @@ if __name__ == '__main__':
 	# [ crop_to_bounds( rasterio_rst, akcan_template.bounds, output_filename, mask=None, mask_value ) for rst in cru_interpolated ]
 	
 
-	# akcan_path = os.path.join( base_path, 'akcan' )
-	# if not os.path.exists( akcan_path ):
-	# 	os.makedirs( akcan_path )
 
 	# # set up some output raster filenames
 
