@@ -1,3 +1,6 @@
+
+import numpy as np # hack to solve a lib issue in the function args of xyztogrid
+
 def cru_xyz_to_shp( in_xyz, lon_col, lat_col, crs, output_filename ):
 	'''
 	convert the cru cl2.0 1961-1990 Climatology data to a shapefile.
@@ -23,9 +26,9 @@ def cru_xyz_to_shp( in_xyz, lon_col, lat_col, crs, output_filename ):
 	import os
 
 	if os.path.splitext( in_xyz )[1] == '.gz':
-		cru_df = pd.read_csv( cru_data, delim_whitespace=True, compression='gzip', header=None, names=colnames )
+		cru_df = pd.read_csv( in_xyz, delim_whitespace=True, compression='gzip', header=None, names=colnames )
 	else:
-		cru_df = pd.read_csv( cru_data, delim_whitespace=True, header=None, names=colnames )
+		cru_df = pd.read_csv( in_xyz, delim_whitespace=True, header=None, names=colnames )
 
 	# create a column named geometry with shapely geometry objects for each row
 	def f( x ):
@@ -90,9 +93,9 @@ def xyz_to_grid( x, y, z, grid, method='cubic', output_dtype=np.float32 ):
 	from scipy.interpolate import griddata
 
 	zi = griddata( (x, y), z, grid, method=method )
-	zi = np.flipud( zi.astype( output_type ) )
+	zi = np.flipud( zi.astype( output_dtype ) )
 	return zi
-def crop_to_bounds( rasterio_rst, bounds, output_filename, mask=None, mask_value ):
+def crop_to_bounds( rasterio_rst, bounds, output_filename, mask=None, mask_value=None ):
 	'''
 	take a rasterio raster object and crop it to a smaller bounding box
 	masking is supported where masked values are 0 and unmasked values are 1
@@ -110,7 +113,7 @@ def crop_to_bounds( rasterio_rst, bounds, output_filename, mask=None, mask_value
 	file path to the newly created file -- essentially the value of output_filename
 
 	'''
-	from rasterio import affine as A
+	from rasterio import Affine as A
 	window = rasterio_rst.window( *bounds )
 	xmin, ymin, xmax, ymax = rasterio_rst.window_bounds( window )
 	row_res, col_res = rasterio_rst.res
@@ -131,35 +134,37 @@ def crop_to_bounds( rasterio_rst, bounds, output_filename, mask=None, mask_value
 				crs=rasterio_rst.meta,
 				nodata=nodata,
 				dtype=rasterio_rst.meta[ 'dtype' ],
-				count=1 )
+				count=1,
+				driver=u'GTiff' )
 
 	with rasterio.open( output_filename, 'w', **meta ) as out:
 		out.write_band( 1, arr )
 	return output_filename
 
 if __name__ == '__main__':
-	import os, rasterio, glob
+	import os, rasterio, glob, fiona
 	import numpy as np
 	import pandas as pd
 	import geopandas as gpd
+	from rasterio import Affine as A
 
 	base_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data'
 
 	# open the Climatic Research Unit (CRU) CL2.0 data downloaded from:
 	#		 http://www.cru.uea.ac.uk/cru/data/hrg/tmc/
-	cru_filename = '/workspace/Data/Base_Data/Climate/World/CRU_grids/CRU_TS20/grid_10min_reh.dat.gz'
+	cru_filename = '/Data/Base_Data/Climate/World/CRU_grids/CRU_TS20/grid_10min_reh.dat.gz'
 	cru_path = os.path.join( base_path, 'cru_ts20' )
 
 	# read in the gzipped .dat file downloaded from the MET Office UK
 	colnames = [ 'lat', 'lon', '01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12' ]
-	cru_df = pd.read_csv( cru_data, delim_whitespace=True, compression='gzip', header=None, names=colnames )
+	cru_df = pd.read_csv( cru_filename, delim_whitespace=True, compression='gzip', header=None, names=colnames )
 
 	# convert to point shapefile
 	cru_shp_fn = os.path.join( cru_path, 'cru_ts20_1961_1990_climatology.shp' )
-	cru_xyz_to_shp( cru_data, 'lon', 'lat', {'init':'epsg:4326'}, cru_shp_fn )
+	cru_xyz_to_shp( cru_filename, 'lon', 'lat', {'init':'epsg:4326'}, cru_shp_fn )
 	
 	# template dataset
-	akcan_template = rasterio.open( os.path.join( base_path, 'templates', 'tas_mean_C_AR5_GFDL-CM3_historical_01_1860.tif' )
+	akcan_template = rasterio.open( os.path.join( base_path, 'templates', 'tas_mean_C_AR5_GFDL-CM3_historical_01_1860.tif' ) )
 	resolution = akcan_template.res
 	akcan_meta = akcan_template.meta
 
@@ -169,10 +174,11 @@ if __name__ == '__main__':
 	npixels = ( -200, -2000, 200, 200 )
 	pad_bounds( akcan_template, npixels, crs, akcan_ext_fn )
 
-	expanded_ext_fn = os.path.join( base_path, 'extents', 'cru_ts20_1961_1990_climatology_3338_akcan_expanded.shp' )
+	# filename for a newly clipped and reprojected shapefile using the above padded bounds shape
+	expanded_ext_fn = os.path.join( base_path, 'intermediate', 'cru_ts20_1961_1990_climatology_3338_akcan_expanded.shp' )
 
 	# reproject / crop to the AKCAN extent, the cru shapefile built above using ogr2ogr
-	os.system( "ogr2ogr -wrapdateline -overwrite -f 'ESRI Shapefile' -clipdst " + akcan_ext_fn +  " -s_srs 'EPSG:4326' -t_srs 'EPSG:3338' " + expanded_ext_fn + " " + cru_shp_fn )
+	os.system( "ogr2ogr -progress -wrapdateline -overwrite -f 'ESRI Shapefile' -clipdst " + akcan_ext_fn +  " -s_srs 'EPSG:4326' -t_srs 'EPSG:3338' " + expanded_ext_fn + " " + cru_shp_fn )
 
 	# generate metadata for the expanded extent to interpolate to
 	xmin, ymin, xmax, ymax = fiona.open( akcan_ext_fn ).bounds
@@ -197,22 +203,68 @@ if __name__ == '__main__':
 	# build the interpolation input values
 	x = np.array(cru_df_akcan.lon.tolist())
 	y = np.array(cru_df_akcan.lat.tolist())
-	z = np.array(cru_df_akcan['01'].tolist())
 
 	# build the output grid
 	xi = np.linspace( xmin, xmax, cols )
 	yi = np.linspace( ymin, ymax, rows )
 	xi, yi = np.meshgrid( xi, yi )
 
-	# interpolate points to grid
+	# build some args	
 	months = ['01','02','03','04','05','06','07','08','09','10','11','12']
-	cru_interpolated = [ xyz_to_grid( x, y, z, grid, method='cubic', output_dtype=np.float32 ) for month in months ]
+	output_filenames = [ os.path.join( akcan_path, 'hur_cru_cl20_akcan_'+month+'_1961_1990.tif' ) for month in months ]
 
-	meta.update( compress='lzw' )
-	output_filename = '/home/UA/malindgren/Documents/hur_cru_cl20_jan.tif'
-	with rasterio.open( output_filename, 'w', **meta ) as out:
-		out.write_band( 1, zi )
+	def interpolate_akcan( x, y, z, grid, expanded_meta, template_rst, output_filename, mask=None, mask_value=None, method='cubic', output_dtype=np.float32 ):
+		'''
+		interpolate across the alaska canada domains and crop / mask to that extent
+		'''	
+		cru_interp = xyz_to_grid( x, y, z, grid, method='cubic', output_dtype=np.float32 )
+		cru_interp = np.nan_to_num( cru_interp )
 
-	# this will crop the data to the akcan extent from the larger interpolation extent.
-	# needs to be looped through the interpolated outputs above.
-	crop_to_bounds( rasterio_rst, akcan.bounds, output_filename, mask=None, mask_value )
+		# convert to in memory rasterio object
+		expanded_meta.update( driver='MEM' )
+		cru_interpolated = rasterio.open( '', mode='w', **expanded_meta )
+		cru_interpolated.write_band( 1, cru_interp )
+
+		akcan = crop_to_bounds( cru_interpolated, template_rst.bounds, output_filename, mask, mask_value )
+		
+		meta = template_rst.meta
+		meta.update( compress='lzw' )
+		with rasterio.open( output_filename, 'w', **meta ) as out:
+			mask = template_rst.read_mask()
+			akcan[ mask == 0 ] = meta[ 'nodata' ]
+			out.write_band( 1, akcan )
+		return output_filename
+
+	def run( args ):
+		return interpolate_akcan( **args )
+
+	# run it in parallel
+	from pathos import multiprocessing as mp
+	args_list = [ { 'x':x, 'y':y, 'z':cru_df_akcan[ month ], 'grid':(xi,yi), 'expanded_meta':expanded_akcan_meta, 'template_rst':akcan_template, 'output_filename':out_fn } for month, out_fn in zip( months, output_filenames ) ]
+	pool = mp.Pool( 10 )
+	pool.map( run, args_list )
+	pool.close()
+
+
+	
+
+	# # interpolate points to grid
+	# cru_interpolated = [ xyz_to_grid( x, y, np.array(cru_df_akcan[ month ].tolist()), (xi, yi), method='cubic', output_dtype=np.float32 ) for month in months ]
+
+	# # crop it to the akcan extent
+	# [ crop_to_bounds( rasterio_rst, akcan_template.bounds, output_filename, mask=None, mask_value ) for rst in cru_interpolated ]
+	
+
+	# akcan_path = os.path.join( base_path, 'akcan' )
+	# if not os.path.exists( akcan_path ):
+	# 	os.makedirs( akcan_path )
+
+	# # set up some output raster filenames
+
+
+	
+	# meta.update( compress='lzw' )
+	# with rasterio.open( output_filename, 'w', **meta ) as out:
+	# 	out.write_band( 1, zi )
+
+
