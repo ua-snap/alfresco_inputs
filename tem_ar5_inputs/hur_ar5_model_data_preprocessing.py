@@ -133,39 +133,8 @@ if __name__ == '__main__':
 
 
 
-# # # # THIS IS A TESTING AREA TO FIGURE OUT THE BEST WAY TO PRESENT THE ALGORITHM WITH DATA FROM THE HOLDINGS
-# THIS IS NOT YET COMPLETE!
-
-# facets
-base_path = '/workspace/Shared/Tech_Projects/ESGF_Data_Access/project_data/data'
-project = 'cmip5'
-institute = 'IPSL' # i wonder if this one is really needed or can we just traverse past it?
-model = 'IPSL-CM5A-LR'  # this is an upper-case representation and can
-experiment = 'historical'
-frequency = 'mon'
-realm = 'atmos'
-cmor_table = 'Amon'
-ensemble = 'r1i1p1'
-variable = 'hur'
-
-patterns = ['*'.join([project, institute, model, experiment, frequency, realm, cmor_table, ensemble, variable])]
-find_files( base_path, patterns )
-
-# /cmip5/output1/IPSL/IPSL-CM5A-LR/historical/mon/atmos/Amon/r1i1p1/v20110406
-
-def rec_dd():
-    return defaultdict(rec_dd)
-
-import os
-from collections import defaultdict
-
-dd = defaultdict( rec_dd )
-for root, subdir, files in os.walk( base_path ):
-	if len(files) is not 0:
-		{'root':root, 'subdir':subdir, 'files':files }
-		print [ os.path.join( root, subdir, f ) for f in files ]
-
-# directory traversal
+# this should be integrated at the top-level
+# directory traversal <<- this stuff is now working 
 import fnmatch
 import functools
 import itertools
@@ -173,26 +142,26 @@ import os
 
 # Remove the annotations if you're not on Python3
 def find_files( dir_path, patterns ):
-    """
-    Returns a generator yielding files matching the given patterns
-    :type dir_path: str
-    :type patterns: [str]
-    :rtype : [str]
-    :param dir_path: Directory to search for files/directories under. Defaults to current dir.
-    :param patterns: Patterns of files to search for. Defaults to ["*"]. Example: ["*.json", "*.xml"]
-    """
-    # not sure why these exist...
-    path = dir_path
-    if not patterns:
-    	path_patterns = [ "*" ]
-    else:
-	    path_patterns = patterns
+	"""
+	Returns a generator yielding files matching the given patterns
+	:type dir_path: str
+	:type patterns: [str]
+	:rtype : [str]
+	:param dir_path: Directory to search for files/directories under. Defaults to current dir.
+	:param patterns: Patterns of files to search for. Defaults to ["*"]. Example: ["*.json", "*.xml"]
+	"""
+	import itertools, functools
+	path = dir_path
+	if not patterns:
+		path_patterns = [ "*" ]
+	else:
+		path_patterns = patterns
 
-    for root_dir, dir_names, file_names in os.walk(path):
-        filter_partial = functools.partial(fnmatch.filter, file_names)
+	for root_dir, dir_names, file_names in os.walk(path):
+		filter_partial = functools.partial(fnmatch.filter, file_names)
 
-        for file_name in itertools.chain( *map( filter_partial, path_patterns ) ):
-            yield os.path.join( root_dir, file_name )
+		for file_name in itertools.chain( *map( filter_partial, path_patterns ) ):
+			yield os.path.join( root_dir, file_name )
 
 # groupby something in the new series
 def grouping_files( x ):
@@ -210,22 +179,69 @@ def group_versions( x ):
 	version = [ x for x in dir_path.split( os.path.sep ) if x.startswith( 'v' ) ]
 	return version
 
-matches = pd.Series([ match for match in find_files( base_path, [ '*hur_*' )] ])
+# lets try with models
+models = [ 'GISS-E2-R',  ] # fill this
+model = 'GISS-E2-R'
 
-hold = [ group for group in matches.groupby( matches.apply( grouping_files ) )]
+# get all matches first
+matches = pd.Series([ match for match in find_files( base_path, [ 'hur_*'+model+'*' ] ) ])
 
-hold = [ group for group in matches.groupby( matches.apply( grouping_files ) ).groupby( matches.apply( group_versions ) )]
+# now lets group em by version
+grouped = dict([ group for group in matches.groupby( matches.apply( grouping_files ) )])
 
-# OR do we just do the simple task of only returning a single 
-# https://github.com/tsileo/dirtools look at this package
+# now we need the keys so that we can split the strings into attributes to parse
+keys_df = pd.DataFrame({ key:key.split( '_' ) for key in grouped.keys() }).T
+
+def drop_old_versions( df ):
+	rows,cols = df.shape
+	if rows > 1 & rows < 3:
+		version_nums = df[ 4 ].apply( lambda x : int( x.replace( 'v', '' ) ) )
+		# max( version_nums )
+		return df.drop( df[df[4] != 'v' + str( max( version_nums ) )].index )
+	elif rows > 3:
+		# potentially unnecessary
+		None
+	else:
+		return df
+
+# parse the keys values to keep only the ones that are latest versions
+keys_df_grouped = pd.concat([ drop_old_versions(i[1]) for i in keys_df.groupby( 2 ) ])
+
+# now keep only the keys we want
+final_out = { k:v for k,v in grouped.iteritems() if k in keys_df_grouped.index.tolist() }
 
 
-# 2 stage groupings:
-# get all the data for a particular variable
-# group all data by the model name
-# group each group by the version number
 
+# # # # THIS IS A TESTING AREA TO FIGURE OUT THE BEST WAY TO PRESENT THE ALGORITHM WITH DATA FROM THE HOLDINGS
+# THIS IS NOT YET COMPLETE!
 
+# facets
+# base_path = '/workspace/Shared/Tech_Projects/ESGF_Data_Access/project_data/data'
+# project = 'cmip5'
+# institute = 'IPSL' # i wonder if this one is really needed or can we just traverse past it?
+# model = 'IPSL-CM5A-LR'  # this is an upper-case representation and can
+# experiment = 'historical'
+# frequency = 'mon'
+# realm = 'atmos'
+# cmor_table = 'Amon'
+# ensemble = 'r1i1p1'
+# variable = 'hur'
 
+# patterns = ['*'.join([project, institute, model, experiment, frequency, realm, cmor_table, ensemble, variable])]
+# find_files( base_path, patterns )
+
+# /cmip5/output1/IPSL/IPSL-CM5A-LR/historical/mon/atmos/Amon/r1i1p1/v20110406
+
+# def rec_dd():
+# 	return defaultdict(rec_dd)
+
+# import os
+# from collections import defaultdict
+
+# dd = defaultdict( rec_dd )
+# for root, subdir, files in os.walk( base_path ):
+# 	if len(files) is not 0:
+# 		{'root':root, 'subdir':subdir, 'files':files }
+# 		print [ os.path.join( root, subdir, f ) for f in files ]
 
 
