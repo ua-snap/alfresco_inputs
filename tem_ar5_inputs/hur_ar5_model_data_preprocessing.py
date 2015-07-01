@@ -63,7 +63,7 @@ def run( args ):
 if __name__ == '__main__':
 	import pandas as pd
 	import numpy as np
-	import os, sys, re, xray, rasterio, glob
+	import os, sys, re, xray, rasterio, glob, argparse
 	from rasterio import Affine as A
 	from rasterio.warp import reproject, RESAMPLING
 	from mpl_toolkits.basemap import shiftgrid, addcyclic
@@ -72,23 +72,34 @@ if __name__ == '__main__':
 	# NOTE: xray is currently only working with: pip install git+https://github.com/xray/xray
 	#		install pathos with: pip install git+https://github.com/uqfoundation/pathos
 
-	# some setup pathing
+	# some setup pathing <<-- THIS TO BE CONVERTED TO ARGUMENTS AT COMMAND LINE
 	input_dir = '/home/UA/malindgren/Documents/hur'
-	os.chdir( input_dir )
+	output_dir = '/home/UA/malindgren/Documents/hur/akcan/new'
 	path = input_dir
 	fn_prefix_filter ='hur_Amon_GFDL-CM3_historical_r1i1p1_*.nc'
 	variable = 'hur'
-	time_begin='1900-01-01'
-	time_end='2005-12-31'
+	time_begin = '1900-01-01' # will change for future and historical
+	time_end = '2005-12-31' # will change for future and historical
+	climatology_begin = '1961-01-01'
+	climatology_end = '1990-12-31'
 	template_fn = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/templates/tas_mean_C_AR5_GFDL-CM3_historical_01_1860.tif'
 	atmos_level = 11
 	cru_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_ts20/akcan'
 
+	# A VERY IMPORTANT NOTE HERE IS THAT WE ARE GOING TO ALSO HAVE TO READ IN THE HISTORICAL DATA FOR 
+	# PERIOD 1961-1990 BECAUSE WE NEED TO CALCULATE ANOMALIES FROM THAT WITH THE MODELED FUTURES.
+	# THIS IS GOING TO REQUIRE SOME THOUGHT ABOUT HOW WE WILL INTEGRATE THIS INTO A SINGLE, DYNAMIC SCRIPT.
+
+	os.chdir( input_dir ) # maybe this should just come from the file list? dirname?
+
 	# open the data and subset to the needed atmos level
+	
+	# THIS NEEDS TO BE MADE ABLE TO DEAL WITH AN INPUT OF TYPE LIST
+	# WHERE LIST IS A GROUP OF FILENAMES TO BE USED AS A SINGLE DATASET
 	ds = read_ar5_mon( path, fn_prefix_filter, variable, level=atmos_level )
 	
 	# generate climatology / anomalies
-	climatology = ds.loc[ '1961-01-01':'1990-12-31' ].groupby( 'time.month' ).mean( 'time' )
+	climatology = ds.loc[ climatology_begin:climatology_end ].groupby( 'time.month' ).mean( 'time' )
 	anomalies = ds.groupby( 'time.month' ) - climatology
 
 	# some setup of the output raster metadata
@@ -117,8 +128,11 @@ if __name__ == '__main__':
 	meta_3338.update( compress='lzw', crs={'init':'epsg:3338'} )
 
 	dst = np.empty_like( rasterio.open( template_fn ).read( 1 ) )
-	output_dir = '/home/UA/malindgren/Documents/hur/akcan/new'
+
+	# LEGIT FILENAMING CONVENTION WITH A PREFIX / SUFFIX PATTERN REQUIRED HERE
 	output_filenames = [ os.path.join( output_dir, 'hur_level11_akcan_' + str(i) + '.tif' ) for i in range( time_len ) ]
+
+	# THIS ASSUMES THEY ARE THE ONLY FILES IN THE DIRECTORY -- COULD BE A GOTCHA
 	cru_files = glob.glob( os.path.join( cru_path, '*.tif' ) )
 	cru_files.sort()
 
@@ -128,7 +142,9 @@ if __name__ == '__main__':
 
 	# run in parallel
 	pool = mp.Pool( 10 )
-	out = pool.map( run, [{'src':src, 'output_filename':fn, 'dst':dst, 'cru':cru, 'src_crs':meta_4326[ 'crs' ], 'src_affine':meta_4326[ 'affine' ], 'dst_crs':meta_3338[ 'crs' ], 'dst_affine':meta_3338[ 'affine' ], 'dst_meta':meta_3338, 'operation':'add' } for src,fn,cru in zip( np.vsplit( dat, time_len ), output_filenames, cru_gen ) ] ) 
+	out = pool.map( run, [{'src':src, 'output_filename':fn, 'dst':dst, 'cru':cru, 'src_crs':meta_4326[ 'crs' ], 'src_affine':meta_4326[ 'affine' ], \
+							'dst_crs':meta_3338[ 'crs' ], 'dst_affine':meta_3338[ 'affine' ], 'dst_meta':meta_3338, 'operation':'add' } \
+							for src,fn,cru in zip( np.vsplit( dat, time_len ), output_filenames, cru_gen ) ] ) 
 	pool.close()
 
 
@@ -163,8 +179,8 @@ def find_files( dir_path, patterns ):
 		for file_name in itertools.chain( *map( filter_partial, path_patterns ) ):
 			yield os.path.join( root_dir, file_name )
 
-# groupby something in the new series
-def grouping_files( x ):
+def version_grouper( x ):
+	''' groupby function for grouping by filenames '''
 	dir_path = os.path.dirname( x )
 	fn, _ = os.path.splitext( os.path.basename( x ) )
 	# remove dates from filename -- they have a hyphen
@@ -173,43 +189,47 @@ def grouping_files( x ):
 	version = [ x for x in dir_path.split( os.path.sep ) if x.startswith( 'v' ) ]
 	return '_'.join([ fn_base, version[0] ])
 
-def group_versions( x ):
-	dir_path = os.path.dirname( x )
-	# return the path element that startswith 'v' this is the version attribute
-	version = [ x for x in dir_path.split( os.path.sep ) if x.startswith( 'v' ) ]
-	return version
-
 # lets try with models
-models = [ 'GISS-E2-R',  ] # fill this
+base_path = '/workspace/Shared/Tech_Projects/ESGF_Data_Access/project_data/data'
+variables = [ 'tas', 'hur' ]
+models = [ 'GISS-E2-R', 'IPSL-CM5A-LR' ] # fill this
+
+# testing stuff
 model = 'GISS-E2-R'
+variable = 'hur'
+prefix = variable + '_*' + model + '*'
 
-# get all matches first
-matches = pd.Series([ match for match in find_files( base_path, [ 'hur_*'+model+'*' ] ) ])
+def lineup_inputs( prefix, root_dir ):
+	# get all matches first
+	matches = pd.Series([ match for match in find_files( root_dir, [ prefix ] ) ])
 
-# now lets group em by version
-grouped = dict([ group for group in matches.groupby( matches.apply( grouping_files ) )])
+	# now lets group em by version
+	grouped = dict([ group for group in matches.groupby( matches.apply( version_grouper ) )])
 
-# now we need the keys so that we can split the strings into attributes to parse
-keys_df = pd.DataFrame({ key:key.split( '_' ) for key in grouped.keys() }).T
+	# now we need the keys so that we can split the strings into attributes to parse
+	keys_df = pd.DataFrame({ key:key.split( '_' ) for key in grouped.keys() }).T
 
-def drop_old_versions( df ):
-	rows,cols = df.shape
-	if rows > 1 & rows < 3:
-		version_nums = df[ 4 ].apply( lambda x : int( x.replace( 'v', '' ) ) )
-		# max( version_nums )
-		return df.drop( df[df[4] != 'v' + str( max( version_nums ) )].index )
-	elif rows > 3:
-		# potentially unnecessary
-		None
-	else:
-		return df
+	def drop_old_versions( df ):
+		rows,cols = df.shape
+		if rows > 1 & rows < 3:
+			version_nums = df[ 4 ].apply( lambda x : int( x.replace( 'v', '' ) ) )
+			# max( version_nums )
+			return df.drop( df[df[4] != 'v' + str( max( version_nums ) )].index )
+		elif rows > 3:
+			# potentially unnecessary
+			None
+		else:
+			return df
 
-# parse the keys values to keep only the ones that are latest versions
-keys_df_grouped = pd.concat([ drop_old_versions(i[1]) for i in keys_df.groupby( 2 ) ])
+	# parse the keys values to keep only the ones that are latest versions
+	keys_df_grouped = pd.concat([ drop_old_versions(i[1]) for i in keys_df.groupby( 2 ) ])
 
-# now keep only the keys we want
-final_out = { k:v for k,v in grouped.iteritems() if k in keys_df_grouped.index.tolist() }
+	# now keep only the keys we want
+	final_out = { k:v for k,v in grouped.iteritems() if k in keys_df_grouped.index.tolist() }
+	return final_out
 
+# run the input lineup
+tmp = lineup_inputs( prefix, base_path )
 
 
 # # # # THIS IS A TESTING AREA TO FIGURE OUT THE BEST WAY TO PRESENT THE ALGORITHM WITH DATA FROM THE HOLDINGS
