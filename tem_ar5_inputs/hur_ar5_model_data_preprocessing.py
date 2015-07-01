@@ -1,3 +1,7 @@
+# # # # #
+# Tool to downscale the CMIP5 data from the PCMDI group. 
+# # # # #
+
 def read_ar5_mon( path, fn_prefix_filter, variable, level=None, time_begin='1900-01-01', time_end='2005-12-31', **kwargs ):
 	'''
 	open file(s) of a given netcdf dataset
