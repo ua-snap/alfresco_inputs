@@ -86,6 +86,9 @@ if __name__ == '__main__':
 	atmos_level = 11
 	cru_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_ts20/akcan'
 
+	# upack argparse'd inputs from the command line
+
+
 	# A VERY IMPORTANT NOTE HERE IS THAT WE ARE GOING TO ALSO HAVE TO READ IN THE HISTORICAL DATA FOR 
 	# PERIOD 1961-1990 BECAUSE WE NEED TO CALCULATE ANOMALIES FROM THAT WITH THE MODELED FUTURES.
 	# THIS IS GOING TO REQUIRE SOME THOUGHT ABOUT HOW WE WILL INTEGRATE THIS INTO A SINGLE, DYNAMIC SCRIPT.
@@ -149,66 +152,47 @@ if __name__ == '__main__':
 
 
 
-# this should be integrated at the top-level
+# this should be a launcher script of the downscaling and run across all of the data
+# then we will run the conversions to vapor pressure on the outputs
+
 # directory traversal <<- this stuff is now working 
 import fnmatch
 import functools
 import itertools
 import os
 
-# Remove the annotations if you're not on Python3
-def find_files( dir_path, patterns ):
-	"""
-	Returns a generator yielding files matching the given patterns
-	:type dir_path: str
-	:type patterns: [str]
-	:rtype : [str]
-	:param dir_path: Directory to search for files/directories under. Defaults to current dir.
-	:param patterns: Patterns of files to search for. Defaults to ["*"]. Example: ["*.json", "*.xml"]
-	"""
-	import itertools, functools
-	path = dir_path
-	if not patterns:
-		path_patterns = [ "*" ]
-	else:
-		path_patterns = patterns
+def group_input_filenames( prefix, root_dir ):
+	''' function that wraps some ugliness regarding returning the files we want to process '''
+	def find_files( dir_path, patterns ):
+		"""
+		Returns a generator yielding files matching the given patterns
+		:type dir_path: str
+		:type patterns: [str]
+		:rtype : [str]
+		:param dir_path: Directory to search for files/directories under. Defaults to current dir.
+		:param patterns: Patterns of files to search for. Defaults to ["*"]. Example: ["*.json", "*.xml"]
+		"""
+		import itertools, functools
+		path = dir_path
+		if not patterns:
+			path_patterns = [ "*" ]
+		else:
+			path_patterns = patterns
 
-	for root_dir, dir_names, file_names in os.walk(path):
-		filter_partial = functools.partial(fnmatch.filter, file_names)
+		for root_dir, dir_names, file_names in os.walk(path):
+			filter_partial = functools.partial(fnmatch.filter, file_names)
 
-		for file_name in itertools.chain( *map( filter_partial, path_patterns ) ):
-			yield os.path.join( root_dir, file_name )
-
-def version_grouper( x ):
-	''' groupby function for grouping by filenames '''
-	dir_path = os.path.dirname( x )
-	fn, _ = os.path.splitext( os.path.basename( x ) )
-	# remove dates from filename -- they have a hyphen
-	fn_base = '_'.join([ i for i in fn.split( '_' ) if '-' not in i ])
-	# return the path element that startswith 'v' this is the version attribute
-	version = [ x for x in dir_path.split( os.path.sep ) if x.startswith( 'v' ) ]
-	return '_'.join([ fn_base, version[0] ])
-
-# lets try with models
-base_path = '/workspace/Shared/Tech_Projects/ESGF_Data_Access/project_data/data'
-variables = [ 'tas', 'hur' ]
-models = [ 'GISS-E2-R', 'IPSL-CM5A-LR' ] # fill this
-
-# testing stuff
-model = 'GISS-E2-R'
-variable = 'hur'
-prefix = variable + '_*' + model + '*'
-
-def lineup_inputs( prefix, root_dir ):
-	# get all matches first
-	matches = pd.Series([ match for match in find_files( root_dir, [ prefix ] ) ])
-
-	# now lets group em by version
-	grouped = dict([ group for group in matches.groupby( matches.apply( version_grouper ) )])
-
-	# now we need the keys so that we can split the strings into attributes to parse
-	keys_df = pd.DataFrame({ key:key.split( '_' ) for key in grouped.keys() }).T
-
+			for file_name in itertools.chain( *map( filter_partial, path_patterns ) ):
+				yield os.path.join( root_dir, file_name )
+	def version_grouper( x ):
+		''' groupby function for grouping by filenames '''
+		dir_path = os.path.dirname( x )
+		fn, _ = os.path.splitext( os.path.basename( x ) )
+		# remove dates from filename -- they have a hyphen
+		fn_base = '_'.join([ i for i in fn.split( '_' ) if '-' not in i ])
+		# return the path element that startswith 'v' this is the version attribute
+		version = [ x for x in dir_path.split( os.path.sep ) if x.startswith( 'v' ) ]
+		return '_'.join([ fn_base, version[0] ])
 	def drop_old_versions( df ):
 		rows,cols = df.shape
 		if rows > 1 & rows < 3:
@@ -221,20 +205,43 @@ def lineup_inputs( prefix, root_dir ):
 		else:
 			return df
 
-	# parse the keys values to keep only the ones that are latest versions
+	# get all matches with prefix
+	matches = pd.Series([ match for match in find_files( root_dir, [ prefix ] ) ])
+
+	# group by version
+	grouped = dict([ group for group in matches.groupby( matches.apply( version_grouper ) )])
+
+	# group keys to DataFrame
+	keys_df = pd.DataFrame({ key:key.split( '_' ) for key in grouped.keys() }).T
+
+	# parse the keys / values and keep only latest versions
 	keys_df_grouped = pd.concat([ drop_old_versions(i[1]) for i in keys_df.groupby( 2 ) ])
 
-	# now keep only the keys we want
+	# make a new dictionary holding the filenames grouped the way we want
 	final_out = { k:v for k,v in grouped.iteritems() if k in keys_df_grouped.index.tolist() }
 	return final_out
 
-# run the input lineup
-tmp = lineup_inputs( prefix, base_path )
+
+# lets try with models
+base_path = '/workspace/Shared/Tech_Projects/ESGF_Data_Access/project_data/data'
+variables = [ 'tas', 'hur' ]
+models = [ 'GISS-E2-R', 'IPSL-CM5A-LR' ] # fill this
+
+# testing stuff
+model = 'GISS-E2-R'
+variable = 'hur'
+prefix = variable + '_*' + model + '*'
+
+for variable in variables:
+	for model in models:
+		prefix = variable + '_*' + model + '*'
+		# run the input lineup
+		tmp = lineup_inputs( prefix, base_path )
+# run the above code here
+os.system( 'python ' )
 
 
-# # # # THIS IS A TESTING AREA TO FIGURE OUT THE BEST WAY TO PRESENT THE ALGORITHM WITH DATA FROM THE HOLDINGS
-# THIS IS NOT YET COMPLETE!
-
+# # # # THIS IS A TESTING AREA 
 # facets
 # base_path = '/workspace/Shared/Tech_Projects/ESGF_Data_Access/project_data/data'
 # project = 'cmip5'
@@ -246,22 +253,4 @@ tmp = lineup_inputs( prefix, base_path )
 # cmor_table = 'Amon'
 # ensemble = 'r1i1p1'
 # variable = 'hur'
-
-# patterns = ['*'.join([project, institute, model, experiment, frequency, realm, cmor_table, ensemble, variable])]
-# find_files( base_path, patterns )
-
-# /cmip5/output1/IPSL/IPSL-CM5A-LR/historical/mon/atmos/Amon/r1i1p1/v20110406
-
-# def rec_dd():
-# 	return defaultdict(rec_dd)
-
-# import os
-# from collections import defaultdict
-
-# dd = defaultdict( rec_dd )
-# for root, subdir, files in os.walk( base_path ):
-# 	if len(files) is not 0:
-# 		{'root':root, 'subdir':subdir, 'files':files }
-# 		print [ os.path.join( root, subdir, f ) for f in files ]
-
 
