@@ -152,6 +152,7 @@ if __name__ == '__main__':
 	import pandas as pd
 	import geopandas as gpd
 	from rasterio import Affine as A
+	from pathos import multiprocessing as mp
 
 	base_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data'
 
@@ -183,7 +184,7 @@ if __name__ == '__main__':
 	expanded_ext_fn = os.path.join( base_path, 'intermediate', 'cru_ts20_1961_1990_climatology_3338_akcan_expanded.shp' )
 
 	# reproject / crop to the AKCAN extent, the cru shapefile built above using ogr2ogr
-	os.system( "ogr2ogr -progress -wrapdateline -overwrite -f 'ESRI Shapefile' -clipdst " + akcan_ext_fn +  " -s_srs 'EPSG:4326' -t_srs 'EPSG:3338' " + expanded_ext_fn + " " + cru_shp_fn )
+	os.system( "ogr2ogr -wrapdateline -overwrite -f 'ESRI Shapefile' -clipdst " + akcan_ext_fn +  " -s_srs 'EPSG:4326' -t_srs 'EPSG:3338' " + expanded_ext_fn + " " + cru_shp_fn )
 
 	# generate metadata for the expanded extent to interpolate to
 	xmin, ymin, xmax, ymax = fiona.open( akcan_ext_fn ).bounds
@@ -222,7 +223,7 @@ if __name__ == '__main__':
 	months = ['01','02','03','04','05','06','07','08','09','10','11','12']
 	output_filenames = [ os.path.join( akcan_path, 'hur_cru_cl20_akcan_'+month+'_1961_1990.tif' ) for month in months ]
 
-	def interpolate_akcan( x, y, z, grid, template_rst, output_filename, mask=None, mask_value=None, method='cubic', output_dtype=np.float32 ):
+	def interpolate_akcan( x, y, z, grid, expanded_meta, template_rst, output_filename, mask=None, mask_value=None, method='cubic', output_dtype=np.float32 ):
 		'''
 		interpolate across the alaska canada domains and crop / mask to that extent
 		'''	
@@ -247,30 +248,10 @@ if __name__ == '__main__':
 	def run( args ):
 		return interpolate_akcan( **args )
 
-	# run it in parallel
-	from pathos import multiprocessing as mp
-	args_list = [ { 'x':x, 'y':y, 'z':np.array(cru_df_akcan[ month ]), 'grid':(xi,yi), 'template_rst':akcan_template, 'output_filename':out_fn } for month, out_fn in zip( months, output_filenames ) ]
-	pool = mp.Pool( 10 )
-	pool.map( run, args_list )
-	pool.close()
-
-
-	
-
-	# # interpolate points to grid
-	# cru_interpolated = [ xyz_to_grid( x, y, np.array(cru_df_akcan[ month ].tolist()), (xi, yi), method='cubic', output_dtype=np.float32 ) for month in months ]
-
-	# # crop it to the akcan extent
-	# [ crop_to_bounds( rasterio_rst, akcan_template.bounds, output_filename, mask=None, mask_value ) for rst in cru_interpolated ]
-	
-
-
-	# # set up some output raster filenames
-
-
-	
-	# meta.update( compress='lzw' )
-	# with rasterio.open( output_filename, 'w', **meta ) as out:
-	# 	out.write_band( 1, zi )
-
+	# run it in parallel -- the pool is not working currently!  switching to serial
+	args_list = [ { 'x':x, 'y':y, 'z':np.array(cru_df_akcan[ month ]), 'grid':(xi,yi), 'expanded_meta':expanded_akcan_meta, 'template_rst':akcan_template, 'output_filename':out_fn } for month, out_fn in zip( months, output_filenames ) ]
+	# pool = mp.Pool( 10 )
+	out = map( run, args_list )
+	# out = pool.map( run, args_list )
+	# pool.close()
 
