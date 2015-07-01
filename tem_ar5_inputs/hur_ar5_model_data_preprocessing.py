@@ -1,6 +1,7 @@
 def read_ar5_mon( path, fn_prefix_filter, variable, level=None, time_begin='1900-01-01', time_end='2005-12-31', **kwargs ):
 	'''
 	open file(s) of a given netcdf dataset
+	using xray mfdataset
 	'''
 	xds = xray.open_mfdataset( os.path.join( path, fn_prefix_filter ) )
 	var = xds[ variable ].loc[ time_begin:time_end ]
@@ -9,17 +10,67 @@ def read_ar5_mon( path, fn_prefix_filter, variable, level=None, time_begin='1900
 	else:
 		out = var[ :, ... ]
 	return out
+def cru_generator( n, cru_clim_list ):
+	'''
+	generator that will produce the cru climatologies with a
+	generator and replicate for the total number of years in n
+	'''
+	months = [ '01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12' ]
+	for i in range( n ):
+		for count, j in enumerate( cru_clim_list ):
+			yield j
+def downscale( src, dst, cru, src_crs, src_affine, dst_crs, dst_affine, output_filename, dst_meta, \
+		method=RESAMPLING.cubic_spline, operation='add', **kwargs ):
+	'''
+	operation can be one of two keywords for the operation to perform the delta downscaling
+	- keyword strings are one of: 'add'= addition, 'mult'=multiplication, or 'div'=division (not implemented)
+	'''
+	def add( cru, anom ):
+		return cru + anom		
+	def mult( cru, anom ):
+		return cru * anom
+	def div( cru, anom ):
+		# return cru / anom
+		# this one may not be useful, but the placeholder is here 
+		return NotImplementedError
+
+	# reproject src to dst
+	out = dst[:]
+	reproject( src,
+			out,
+			src_transform=src_affine,
+			src_crs=src_crs,
+			dst_transform=dst_affine,
+			dst_crs=dst_crs,
+			resampling=method )
+	# switch to deal with different downscaling operators
+	operation_switch = { 'add':add, 'mult':mult, 'div':div }
+	downscaled = operation_switch[ operation ]( cru, out )
+
+	# this is a geotiff creator so lets pass in the lzw compression
+	dst_meta.update( compress='lzw' )
+	with rasterio.open( output_filename, 'w', **dst_meta ) as out:
+		out.write_band( 1, downscaled )
+	return output_filename
+def run( args ):
+	''' 
+	simple function wrapper for unpacking an argument dict 
+	to the downscale function for getting around the single 
+	argument pass to multiprocessing.map implementation issue.
+	'''
+	return( downscale( **args ) )
 
 if __name__ == '__main__':
 	import pandas as pd
 	import numpy as np
-	import os, sys, re, xray, rasterio
+	import os, sys, re, xray, rasterio, glob
 	from rasterio import Affine as A
 	from rasterio.warp import reproject, RESAMPLING
 	from mpl_toolkits.basemap import shiftgrid, addcyclic
-	from functools import partial
+	from pathos import multiprocessing as mp
 
-	# NOTE: xray is currently only working with the pip install git+https://github.com/xray/xray
+	# NOTE: xray is currently only working with: pip install git+https://github.com/xray/xray
+	#		install pathos with: pip install git+https://github.com/uqfoundation/pathos
 
 	# some setup pathing
 	input_dir = '/home/UA/malindgren/Documents/hur'
@@ -29,8 +80,9 @@ if __name__ == '__main__':
 	variable = 'hur'
 	time_begin='1900-01-01'
 	time_end='2005-12-31'
-	template_fn = '/home/UA/malindgren/Documents/tas_mean_C_AR5_GFDL-CM3_historical_01_1860.tif'
+	template_fn = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/templates/tas_mean_C_AR5_GFDL-CM3_historical_01_1860.tif'
 	atmos_level = 11
+	cru_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_ts20/akcan'
 
 	# open the data and subset to the needed atmos level
 	ds = read_ar5_mon( path, fn_prefix_filter, variable, level=atmos_level )
@@ -50,197 +102,39 @@ if __name__ == '__main__':
 	dat, lons = shiftgrid( 180., anomalies[:], anomalies.lon.data, start=False )#
 
 	# metadata for input?
-	meta_4326 = { 'affine':affine,
-			'height':rows,
-			'width':cols,
-			'crs':crs,
-			'driver':'GTiff',
-			'dtype':np.float32,
-			'count':time_len,
-			'transform':affine.to_gdal(),
-			'compress':'lzw' }
+	meta_4326 = {'affine':affine,
+				'height':rows,
+				'width':cols,
+				'crs':crs,
+				'driver':'GTiff',
+				'dtype':np.float32,
+				'count':time_len,
+				'transform':affine.to_gdal(),
+				'compress':'lzw' }
 
 	# grab template metadata and write and reproject to it
-	template = rasterio.open( template_fn )
-	meta_3338 = template.meta
-	meta_3338.update( compress='lzw', crs={'init':'epsg:3338'} ) # 	meta_3338 = rasterio.open( template_fn ).meta
+	meta_3338 = rasterio.open( template_fn ).meta
+	meta_3338.update( compress='lzw', crs={'init':'epsg:3338'} )
 
-	# output_filename = 'test.tif'
+	dst = np.empty_like( rasterio.open( template_fn ).read( 1 ) )
+	output_dir = '/home/UA/malindgren/Documents/hur/akcan/new'
+	output_filenames = [ os.path.join( output_dir, 'hur_level11_akcan_' + str(i) + '.tif' ) for i in range( time_len ) ]
+	cru_files = glob.glob( os.path.join( cru_path, '*.tif' ) )
+	cru_files.sort()
 
-	# with rasterio.open( output_filename, 'w', **meta_3338 ) as out:
-	# 	print 'generated new output rst %s' % output_filename
+	# this is effectively working
+	cru_stack = [ rasterio.open( fn ).read( 1 ) for fn in cru_files ]
+	cru_gen = cru_generator( 1271, cru_stack )
 
-	# out = []
-	# for x in np.vsplit( dat, time_len ):
-	# 	dst = np.empty_like( template.read(1) ) # np.zeros( shape=( time_len, meta_3338[ 'height' ], meta_3338[ 'width' ]))
-	# 	reproject( x,
-	# 				dst,
-	# 				src_transform=meta_4326[ 'affine' ],
-	# 				src_crs=meta_4326[ 'crs' ],
-	# 				dst_transform=meta_3338[ 'affine' ],
-	# 				dst_crs={'init':'epsg:3338'},
-	# 				resampling=RESAMPLING.cubic_spline )
-	# 	out.append( dst )
-
-def downscale( src, dst, cru, src_crs, src_affine, dst_crs, dst_affine, output_filename, dst_meta, \
-		method=RESAMPLING.cubic_spline, operation='add' **kwargs ):
-	'''
-	operation can be one of two keywords for the operation to perform the delta downscaling
-	- keyword strings are one of: 'add'= addition, 'mult'=multiplication, or 'div'=division
-	'''
-	out = dst[:]
-	# reproject src to dst
-	reproject( src,
-			out,
-			src_transform=src_affine,
-			src_crs=src_crs,
-			dst_transform=dst_affine,
-			dst_crs=dst_crs,
-			resampling=method )
-	
-	{ 'add':np.sum, 'mult':np.mult, }
-
-	if operation == 'add':
-		downscaled = out + 
+	# run in parallel
+	pool = mp.Pool( 10 )
+	out = pool.map( run, [{'src':src, 'output_filename':fn, 'dst':dst, 'cru':cru, 'src_crs':meta_4326[ 'crs' ], 'src_affine':meta_4326[ 'affine' ], 'dst_crs':meta_3338[ 'crs' ], 'dst_affine':meta_3338[ 'affine' ], 'dst_meta':meta_3338, 'operation':'add' } for src,fn,cru in zip( np.vsplit( dat, time_len ), output_filenames, cru_gen ) ] ) 
+	pool.close()
 
 
 
-def f( src_hur, src_tas, src_cru, dst, src_crs, src_affine, dst_crs, dst_affine, output_filename, dst_meta, \
-		method=RESAMPLING.cubic_spline, **kwargs ):
-	
-	# reproject / resample to akcan
-	# hur
-	hur = dst[:]
-	reproject( src_hur,
-				hur,
-				src_transform=src_affine,
-				src_crs=src_crs,
-				dst_transform=dst_affine,
-				dst_crs=dst_crs,
-				resampling=method )
-
-	# tas
-	hur = dst[:]
-	reproject( src_hur,
-				hur,
-				src_transform=src_affine,
-				src_crs=src_crs,
-				dst_transform=dst_affine,
-				dst_crs=dst_crs,
-				resampling=method )
-
-	# downscale - add climatology and anomaly files for the same month
-	# for temperature
-	downscaled.month.tas <- cru.tas.current+nc.interp.r
-	
-	#### END TAS
-
-	# # here we get the values of the current downscaled layer
-	downscaled.month.flip.hur.r.v <- getValues(downscaled.month.flip.hur.r)
-	
-	# now we change the >100 values to 95 as per steph's okaying it
-	values(downscaled.month.flip.hur.r)[which(values(downscaled.month.flip.hur.r) > 100)] <- 95
-
-	print("***** 	COVNERTING RELATIVE HUMIDITY BACK TO VAPOR PRESSURE 	******************")
-
-	# make the rasters into matrices
-	tas.mat <- getValues(downscaled.month.flip.tas.r) 
-	hur.mat <- getValues(downscaled.month.flip.hur.r)
-
-	# new rasters to hold the output based on the information from the current set
-	vapor.ts31.10min <- raster(downscaled.month.flip.tas.r)
-
-	# convert back to vapor pressure
-	esa = 6.112*exp(17.62*tas.mat/(243.12+tas.mat))
-	vapor.ts31.10min.hold = (hur.mat*esa)/100
-	# set the converted values into a vapor pressure variable
-	vapor.ts31.10min <- setValues(vapor.ts31.10min,vapor.ts31.10min.hold)
-
-	with rasterio.open( output_filename, 'w', **dst_meta ) as out:
-		out.write_band( 1, dst2 )
-
-
-	return output_filename
-
-dst = np.empty_like( rasterio.open( template_fn ).read( 1 ) )
-# from pathos import multiprocessing as mp
-import multiprocessing as mp
-pool = mp.Pool( 10 )
-# f2 = partial( f, dst=dst, src_crs=meta_4326[ 'crs' ], src_affine=meta_4326[ 'affine' ], dst_crs=meta_3338[ 'crs' ], dst_affine=meta_3338[ 'affine' ], dst_meta=meta_3338 )
-output_dir = '/home/UA/malindgren/Documents/hur/akcan'
-output_filenames = [ os.path.join( output_dir, 'hur_level11_akcan_'+str(i) + '.tif' ) for i in range( time_len ) ]
-out = pool.map( lambda x: f( **x ), [{'src':src, 'output_filename':fn, 'dst':dst, 'src_crs':meta_4326[ 'crs' ], 'src_affine':meta_4326[ 'affine' ], 'dst_crs':meta_3338[ 'crs' ], 'dst_affine':meta_3338[ 'affine' ], 'dst_meta':meta_3338 } for src,fn in zip( np.vsplit( dat, time_len ), output_filenames ) ] )
-pool.close()
-
-# # # 
-
-# open multiple datasets as a single file
-xds = xray.open_mfdataset( 'hur_Amon_GFDL-CM3_historical_r1i1p1_*.nc' )
-xds_hur = xds.hur.loc[ '1900-01-01':'2005-12-12' ] # slice the dataset using the time variable in xray object
-hur_lev = xds_hur[ :, atmos_level, ... ]
-
-# calculate climatology and anomalies
-climatology = hur_lev.loc[ '1961-01-01':'1990-12-31' ].groupby( 'time.month' ).mean( 'time' )
-anomalies = hur_lev.groupby( 'time.month' ) - climatology
-
-# # # REPROJECT AND CROP EXTENT
-
-time_len, rows, cols = hur_lev.shape
-# NOTE: geotransform = [left, res, 0.0, top, 0.0, res]
-height = rows
-width = cols
-crs = 'epsg:4326'
-affine = A( *[np.diff( xds.lon )[ 0 ], 0.0, -180.0, 0.0, -np.diff( xds.lat )[ 0 ], 90.0] )
-count = time_len
-resolution = ( np.diff( xds.lat )[ 0 ], np.diff( xds.lon )[ 0 ] )
-
-# shift the grid to Greenwich Centering
-dat, lons = shiftgrid( 180., anomalies[:], anomalies.lon.data, start=False )#
-
-# metadata for input?
-meta = { 'affine':affine,
-		'height':rows,
-		'width':cols,
-		'crs':crs,
-		'driver':'GTiff',
-		'dtype':np.float32,
-		'count':1 }
-
-meta.update( transform=meta[ 'affine' ].to_gdal() )
-
-# test write
-output_filename = '/home/UA/malindgren/Documents/test_out_hur_orient.tif'
-with rasterio.open( output_filename, 'w', **meta ) as out:
-	out.write_band( 1, hur_lev[1, ...].astype( np.float32 ) )
-
-# test write
-output_filename = '/home/UA/malindgren/Documents/test_out_rst_c.tif'
-with rasterio.open( output_filename, 'w', **meta ) as out:
-	out.write_band( 1, dat.astype( np.float32 ) )
-
-# setup output and reproject
-rst = rasterio.open( '/home/UA/malindgren/Documents/tas_mean_C_AR5_GFDL-CM3_historical_01_1860.tif' )
-dst = np.empty_like( rst.read( 1 ) )
-
-reproject( dat,
-			dst,
-			src_transform=affine.to_gdal(),
-			src_crs={'init':'epsg:4326'},
-			dst_transform=rst.affine.to_gdal(),
-			dst_crs={'init':'epsg:3338'},
-			resampling=RESAMPLING.cubic_spline )
-
-# write it out
-output_filename = '/home/UA/malindgren/Documents/test_out_rst5.tif'
-meta = rst.meta
-meta.update( compress='lzw' ) #, crs={'init':'epsg:3338'}
-with rasterio.open( output_filename, 'w', **meta ) as out:
-	out.write_band( 1, dst.astype( np.float32 ) )
-
-# plot it with mpl
-plt.imshow( dst )
-plt.savefig( '/home/UA/malindgren/Documents/test_out5.png' )
-plt.close()
+# # # # THIS IS A TESTING AREA TO FIGURE OUT THE BEST WAY TO PRESENT THE ALGORITHM WITH DATA FROM THE HOLDINGS
+# THIS IS NOT YET COMPLETE!
 
 # facets
 base_path = '/workspace/Shared/Tech_Projects/ESGF_Data_Access/project_data/data'
@@ -253,8 +147,6 @@ realm = 'atmos'
 cmor_table = 'Amon'
 ensemble = 'r1i1p1'
 variable = 'hur'
-
-hur_Amon_rcp45_r1i1p1_v20110914
 
 patterns = ['*'.join([project, institute, model, experiment, frequency, realm, cmor_table, ensemble, variable])]
 find_files( base_path, patterns )
