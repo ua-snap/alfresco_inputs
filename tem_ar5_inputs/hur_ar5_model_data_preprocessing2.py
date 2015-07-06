@@ -311,6 +311,9 @@ files = group_input_filenames( fn_prefix_filter, base_path )
 # tmp = xray.concat([ xray.open_dataset( i ).load() for i in paths[:5] ], 'time' )
 # tmp.to_netcdf( 'test_output_xray.nc', mode='w', format='NETCDF4' )
 
+
+
+# pre-processing area -- this will become its own script since it needs running only once.
 def get_file_years( filename ):
 	path, fn = os.path.split( filename )
 	fn, ext = os.path.splitext( fn )
@@ -318,17 +321,9 @@ def get_file_years( filename ):
 	dates = split[ len( split ) - 1 ] # grab last element
 	begin, end = dates.split( '-' )
 	return [begin, end]
-
-
-# example
-# arr = np.array([ get_file_years( filename ) for filename in filelist ])
-# begin_year, end_year = arr.min(), arr.max()
-
 def get_modelname( filename ):
 	path, fn = os.path.split( filename )
 	return [ i for i in path.split( '/' ) if i in models ][0]
-
-
 def concat_to_nc( filelist, output_filename, variable, dim='time', begin_time=None, end_time=None, format='NETCDF4', **kwargs ):
 	'''
 	take list of consecutive netcdf files (made for CMIP5 data) and stack them into a 
@@ -364,57 +359,53 @@ def concat_to_nc( filelist, output_filename, variable, dim='time', begin_time=No
 		ds.to_netcdf( output_filename, mode='w', format=format )
 	return output_filename
 
-# prep the downloaded files 
-variables = ['tas','hur']
-fn_prefix_filter = variable + '_*' + model + '*'
-base_path = '/workspace/Shared/Tech_Projects/ESGF_Data_Access/project_data/data'
-file_groups = group_input_filenames( fn_prefix_filter, base_path )
+if __name__ == '__main__':
+	# prep the downloaded files 
+	variables = [ 'tas', 'hur' ]
+	fn_prefix_filter = variable + '_*' + model + '*'
+	base_path = '/workspace/Shared/Tech_Projects/ESGF_Data_Access/project_data/data'
+	file_groups = group_input_filenames( fn_prefix_filter, base_path )
 
-for model in models:
-	for variable in variables:
-		for files in file_groups.values():
-			try:
-				files = sorted( files.tolist() )
-				base_path = '/workspace/Shared/Tech_Projects/ESGF_Data_Access/project_data'
-				output_path = os.path.join( base_path, 'prepped', model, variable )
-				fn = files[ 0 ]
-				model = get_modelname( fn )
-				begin_year ='190001'
-				end_year = '210012'
-				# this is a hacky sort of thing...
-				output_filename = os.path.join( output_path, model, '_'.join([ '_'.join( os.path.splitext( os.path.basename( fn ) )[0].split( '_' )[:-1] ), str(begin_year), str(end_year)]) + '.nc' )
+	for model in models:
+		for variable in variables:
+			for files in file_groups.values():
+				try:
+					files = sorted( files.tolist() )
+					base_path = '/workspace/Shared/Tech_Projects/ESGF_Data_Access/project_data'
+					output_path = os.path.join( base_path, 'prepped', model, variable )
+					fn = files[ 0 ]
+					model = get_modelname( fn )
+					begin_year ='190001'
+					end_year = '210012'
+					# this is a hacky sort of thing...
+					output_filename = os.path.join( output_path, model, '_'.join([ '_'.join( os.path.splitext( os.path.basename( fn ) )[0].split( '_' )[:-1] ), str(begin_year), str(end_year)]) + '.nc' )
 
-				# this logic can be fine tuned to subset the data down to only the files we need
-				# for this project it is 1900-2100.
-				df = pd.DataFrame([ get_file_years(fn) for fn in files ])
+					# this logic can be fine tuned to subset the data down to only the files we need
+					# for this project it is 1900-2100.
+					df = pd.DataFrame([ get_file_years(fn) for fn in files ])
 
-				# this is the way to interrogate that dataframe for the values we want
-				df = df.astype( int )
-				begin_idx = (np.abs(df[0].astype( int ) - int(begin_year) ) ).argmin()
-				end_idx = (np.abs(df[1].astype( int ) - int(end_year) ) ).argmin()
+					# this is the way to interrogate that dataframe for the values we want
+					df = df.astype( int )
+					begin_idx = (np.abs(df[0].astype( int ) - int(begin_year) ) ).argmin()
+					end_idx = (np.abs(df[1].astype( int ) - int(end_year) ) ).argmin()
 
-				# return the files between the desired date ranges
-				if begin_idx == end_idx:
-					files = [files[ begin_idx ]]
-				else:
-					files = files[ begin_idx:end_idx + 1 ]
+					# return the files between the desired date ranges
+					if begin_idx == end_idx:
+						files = [files[ begin_idx ]]
+					else:
+						files = files[ begin_idx:end_idx + 1 ]
 
-				# print files
+					# print files
 
-				if not os.path.exists( os.path.dirname( output_filename ) ):
-					os.makedirs( os.path.dirname( output_filename ) )
-				
-				# run the concatenation and the output to a new netcdf file
-				concat_to_nc( files, output_filename, variable, dim='time', begin_time=begin_year[:4], end_time=end_year[:4] )
+					if not os.path.exists( os.path.dirname( output_filename ) ):
+						os.makedirs( os.path.dirname( output_filename ) )
+					
+					# run the concatenation and the output to a new netcdf file
+					concat_to_nc( files, output_filename, variable, dim='time', begin_time=begin_year[:4], end_time=end_year[:4] )
 
-			except:
-				print '\n--> ERROR !!!\n\n%s\n\n' % files
-				pass
+				except:
+					print '\n--> ERROR !!!\n\n%s\n\n' % files
+					pass
 
-
-
-# this is the way to reopen that file using dask arrays and out of core computation
-# ds = xray.open_dataset( output_filename, chunks={ 'time': 100 } )
-# hur = ds[ 'hur' ].loc[ '2006':'2100' ][ :, 16, ... ]
 
 
