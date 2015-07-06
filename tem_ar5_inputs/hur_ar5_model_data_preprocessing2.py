@@ -320,8 +320,6 @@ def get_file_years( filename ):
 	return [begin, end]
 
 
-
-
 # example
 # arr = np.array([ get_file_years( filename ) for filename in filelist ])
 # begin_year, end_year = arr.min(), arr.max()
@@ -331,7 +329,7 @@ def get_modelname( filename ):
 	return [ i for i in path.split( '/' ) if i in models ][0]
 
 
-def concat_to_nc( filelist, output_filename, dim='time', format='NETCDF4', **kwargs ):
+def concat_to_nc( filelist, output_filename, variable, dim='time', begin_time=None, end_time=None, format='NETCDF4', **kwargs ):
 	'''
 	take list of consecutive netcdf files (made for CMIP5 data) and stack them into a 
 	single larger netcdf file.  This was necessary to overcome some bugginess in how 
@@ -343,7 +341,10 @@ def concat_to_nc( filelist, output_filename, dim='time', format='NETCDF4', **kwa
 	-----------
 	filelist = [list] list of string file paths to the sorted netcdf files to stack together
 	output_filename = [str] path to and name of the output file to be generated (.nc extension)
+	variable = [str] abbreviated name of the variable being converted. i.e 'tas'/'pr'/'hur'
 	dim = [str] dimension to stack on -- default is 'time'
+	begin_time = [str] PANDAS style datetime string syntax -- used in xray
+	end_time = [str] PANDAS style datetime string syntax -- used in xray
 	format = [str] output NetCDF format desired. valid strings are:
 					'NETCDF4', 'NETCDF4_CLASSIC', 'NETCDF3_64BIT', 'NETCDF3_CLASSIC'
 					default is 'NETCDF4'
@@ -357,48 +358,58 @@ def concat_to_nc( filelist, output_filename, dim='time', format='NETCDF4', **kwa
 	'''
 	import xray
 	with xray.concat([ xray.open_dataset( i ).load() for i in filelist ], dim ) as ds:
+		# time slicer condition
+		if begin_time != None and end_time != None:
+			ds = ds.loc[ dict( time=slice( begin_time, end_time )) ]
 		ds.to_netcdf( output_filename, mode='w', format=format )
 	return output_filename
 
-# example
-# maybe just use the base prefix from the input file itself
-# this is a very big yes 
-# example
-variable = 'hur'
+# prep the downloaded files 
+variables = ['tas','hur']
 fn_prefix_filter = variable + '_*' + model + '*'
 base_path = '/workspace/Shared/Tech_Projects/ESGF_Data_Access/project_data/data'
 file_groups = group_input_filenames( fn_prefix_filter, base_path )
 
-for files in file_groups.values():
-	files = sorted( files.tolist() )
-	base_path = '/workspace/Shared/Tech_Projects/ESGF_Data_Access/project_data'
-	output_path = os.path.join( base_path, 'prepped' )
-	fn = files[ 0 ]
-	model = get_modelname( fn )
-	begin_year ='200601'
-	end_year = '210012'
-	output_filename = os.path.join( output_path, model, '_'.join([ os.path.splitext( os.path.basename( fn ) )[0], str(begin_year), str(end_year)]) + '.nc' )
+for model in models:
+	for variable in variables:
+		for files in file_groups.values():
+			try:
+				files = sorted( files.tolist() )
+				base_path = '/workspace/Shared/Tech_Projects/ESGF_Data_Access/project_data'
+				output_path = os.path.join( base_path, 'prepped', model, variable )
+				fn = files[ 0 ]
+				model = get_modelname( fn )
+				begin_year ='190001'
+				end_year = '210012'
+				# this is a hacky sort of thing...
+				output_filename = os.path.join( output_path, model, '_'.join([ '_'.join( os.path.splitext( os.path.basename( fn ) )[0].split( '_' )[:-1] ), str(begin_year), str(end_year)]) + '.nc' )
 
-	# this logic can be fine tuned to subset the data down to only the files we need
-	# for this project it is 1900-2100.
-	df = pd.DataFrame([ get_file_years(fn) for fn in files ])
-	# get the values of the beginning and end that are closest to what we want 
-	begin_val = df[0][(df[0].astype(int) - int(begin_year) >= 0)].min()
-	begin_ind,  = np.where(df[0] == begin_val)
-	end_val = df[ 1 ][ ( df[ 1 ].astype( int ) - int( end_year ) >= 0 ) ].min()
-	end_ind, = np.where( df[ 1 ] == end_val )
+				# this logic can be fine tuned to subset the data down to only the files we need
+				# for this project it is 1900-2100.
+				df = pd.DataFrame([ get_file_years(fn) for fn in files ])
 
-	# return the files between the desired date ranges
-	if begin_ind == end_ind:
-		file_list = [files[ begin_ind ]]
-	else:
-		file_list = files[ begin_ind:end_ind + 1 ]
+				# this is the way to interrogate that dataframe for the values we want
+				df = df.astype( int )
+				begin_idx = (np.abs(df[0].astype( int ) - int(begin_year) ) ).argmin()
+				end_idx = (np.abs(df[1].astype( int ) - int(end_year) ) ).argmin()
 
-	if not os.path.exists( os.path.dirname( output_filename ) ):
-		os.makedirs( os.path.dirname( output_filename ) )
-	concat_to_nc( file_list, output_filename )
+				# return the files between the desired date ranges
+				if begin_idx == end_idx:
+					files = [files[ begin_idx ]]
+				else:
+					files = files[ begin_idx:end_idx + 1 ]
 
+				# print files
 
+				if not os.path.exists( os.path.dirname( output_filename ) ):
+					os.makedirs( os.path.dirname( output_filename ) )
+				
+				# run the concatenation and the output to a new netcdf file
+				concat_to_nc( files, output_filename, variable, dim='time', begin_time=begin_year[:4], end_time=end_year[:4] )
+
+			except:
+				print '\n--> ERROR !!!\n\n%s\n\n' % files
+				pass
 
 
 

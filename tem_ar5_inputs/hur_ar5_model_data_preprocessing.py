@@ -2,11 +2,14 @@
 # Tool to downscale the CMIP5 data from the PCMDI group. 
 # # # # #
 
-def read_ar5_mon( path, fn_prefix_filter, variable, level=None, time_begin='1900-01-01', time_end='2005-12-31', **kwargs ):
+def read_ar5_mon( path, variable, model, ensemble='r1i1p1', level=None, time_begin='1900-01-01', time_end='2005-12-31', **kwargs ):
 	'''
 	open file(s) of a given netcdf dataset
 	using xray mfdataset
 	'''
+	path = os.path.dirname(files.tolist()[0])
+	fn_prefix_filter = '*'.join([variable, model, ensemble, '.nc']) # hardwired extension...
+
 	xds = xray.open_mfdataset( os.path.join( path, fn_prefix_filter ) )
 	var = xds[ variable ].loc[ time_begin:time_end ]
 	if level:
@@ -82,12 +85,12 @@ if __name__ == '__main__':
 	path = input_dir
 	fn_prefix_filter ='hur_Amon_GFDL-CM3_historical_r1i1p1_*.nc'
 	variable = 'hur'
-	time_begin = '1900-01-01' # will change for future and historical
-	time_end = '2005-12-31' # will change for future and historical
+	time_begin = '2006-01-01' # will change for future and historical
+	time_end = '2100-12-31' # will change for future and historical
 	climatology_begin = '1961-01-01'
 	climatology_end = '1990-12-31'
 	template_fn = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/templates/tas_mean_C_AR5_GFDL-CM3_historical_01_1860.tif'
-	atmos_level = 11
+	atmos_level = 16
 	cru_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_ts20/akcan'
 
 	# upack argparse'd inputs from the command line
@@ -99,11 +102,17 @@ if __name__ == '__main__':
 
 	os.chdir( input_dir ) # maybe this should just come from the file list? dirname?
 
-	# open the data and subset to the needed atmos level
 	
 	# THIS NEEDS TO BE MADE ABLE TO DEAL WITH AN INPUT OF TYPE LIST
 	# WHERE LIST IS A GROUP OF FILENAMES TO BE USED AS A SINGLE DATASET
-	ds = read_ar5_mon( path, fn_prefix_filter, variable, level=atmos_level )
+	# ds = read_ar5_mon( path, variable, fn_prefix_filter, level=atmos_level )
+
+	# this will need refactoring
+
+
+	# open the data and subset to the needed atmos level (if relevant)
+	ds = read_ar5_mon( path, variable, model, level=atmos_level, time_begin=time_begin, time_end=time_end )
+	# ds = read_ar5_mon( path, variable, fn_prefix_filter, level=atmos_level, time_begin='2006-01-01', time_end='2100-12-31' )
 	
 	# generate climatology / anomalies
 	climatology = ds.loc[ climatology_begin:climatology_end ].groupby( 'time.month' ).mean( 'time' )
@@ -183,7 +192,7 @@ def group_input_filenames( prefix, root_dir ):
 		else:
 			path_patterns = patterns
 
-		for root_dir, dir_names, file_names in os.walk(path):
+		for root_dir, dir_names, file_names in os.walk( path ):
 			filter_partial = functools.partial(fnmatch.filter, file_names)
 
 			for file_name in itertools.chain( *map( filter_partial, path_patterns ) ):
@@ -208,6 +217,8 @@ def group_input_filenames( prefix, root_dir ):
 			None
 		else:
 			return df
+	def drop_outer_times():
+		'''	 '''
 
 	# get all matches with prefix
 	matches = pd.Series([ match for match in find_files( root_dir, [ prefix ] ) ])
@@ -225,6 +236,7 @@ def group_input_filenames( prefix, root_dir ):
 	final_out = { k:v for k,v in grouped.iteritems() if k in keys_df_grouped.index.tolist() }
 	return final_out
 
+MFDataset( os.path.join( '/workspace/Shared/Tech_Projects/ESGF_Data_Access/project_data/data/cmip5/output1/IPSL/IPSL-CM5A-LR/rcp85/mon/atmos/Amon/r1i1p1/v20111103/hur', '*' ) )
 
 # lets try with models
 base_path = '/workspace/Shared/Tech_Projects/ESGF_Data_Access/project_data/data'
@@ -232,7 +244,7 @@ variables = [ 'tas', 'hur' ]
 models = [ 'GISS-E2-R', 'IPSL-CM5A-LR' ] # fill this
 
 # testing stuff
-model = 'GISS-E2-R'
+model = 'IPSL-CM5A-LR'
 variable = 'hur'
 prefix = variable + '_*' + model + '*'
 
