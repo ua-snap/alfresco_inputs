@@ -1,8 +1,7 @@
-# pre-processing area -- this will become its own script since it needs running only once.
+# pre-processing area
 def group_input_filenames( prefix, root_dir ):
 	import fnmatch, functools, itertools, os, glob
 	import pandas as pd
-
 	''' function that wraps some ugliness regarding returning the files we want to process '''
 	def find_files( dir_path, patterns ):
 		"""
@@ -37,9 +36,9 @@ def group_input_filenames( prefix, root_dir ):
 	def drop_old_versions( df ):
 		rows,cols = df.shape
 		if rows > 1 & rows < 3:
-			version_nums = df[ 4 ].apply( lambda x : int( x.replace( 'v', '' ) ) )
+			version_nums = df[ df.columns[-1] ].apply( lambda x : int( x.replace( 'v', '' ) ) )
 			# max( version_nums )
-			return df.drop( df[df[4] != 'v' + str( max( version_nums ) )].index )
+			return df.drop( df[ df[ df.columns[-1] ] != 'v' + str( max( version_nums ) )].index )
 		elif rows > 3:
 			# potentially unnecessary
 			None
@@ -53,7 +52,7 @@ def group_input_filenames( prefix, root_dir ):
 	# group keys to DataFrame
 	keys_df = pd.DataFrame({ key:key.split( '_' ) for key in grouped.keys() }).T
 	# parse the keys / values and keep only latest versions
-	keys_df_grouped = pd.concat([ drop_old_versions(i[1]) for i in keys_df.groupby( 2 ) ])
+	keys_df_grouped = pd.concat([ drop_old_versions(i[1]) for i in keys_df.groupby( keys_df.columns[-3] ) ])
 	# make a new dictionary holding the filenames grouped the way we want
 	final_out = { k:v for k,v in grouped.iteritems() if k in keys_df_grouped.index.tolist() }
 	return final_out
@@ -119,15 +118,17 @@ if __name__ == '__main__':
 	import numpy as np
 	import pandas as pd
 
-	models = [ 'GISS-E2-R','IPSL-CM5A-LR', 'MRI-CGCM3', 'CCSM4', 'GFDL-CM3' ]
+	# models = [ 'GISS-E2-R','IPSL-CM5A-LR', 'MRI-CGCM3', 'CCSM4', 'GFDL-CM3' ]
+	models = [ 'CCSM4' ]
 	variables = [ 'tas', 'hur' ]
 	base_path = '/workspace/Shared/Tech_Projects/ESGF_Data_Access/project_data/data'
 
 	# problem_files
-	if not os.path.exists(  os.path.join( base_path, 'prepped' )):
-		os.makedirs( os.path.join( base_path, 'prepped') )
+	output_base_path = os.path.join( base_path, 'prepped' )
+	if not os.path.exists( output_base_path ):
+		os.makedirs( output_base_path )
 
-	problem_files_log = open( os.path.join( base_path, 'prepped', 'error_files.txt' ), mode='w' )
+	problem_files_log = open( os.path.join( output_base_path, 'error_files.txt' ), mode='w' )
 
 	for model in models:
 		for variable in variables:
@@ -136,13 +137,26 @@ if __name__ == '__main__':
 			for files in file_groups.values():
 				try:
 					files = sorted( files.tolist() )
-					output_path = os.path.join( base_path, 'prepped', model, variable )
+					output_path = os.path.join( output_base_path, model, variable )
+
+					if not os.path.exists( os.path.dirname( output_path ) ):
+						os.makedirs( os.path.dirname( output_path ) )
+
 					fn = files[ 0 ]
 					model = get_modelname( fn )
 					begin_year ='190001'
 					end_year = '210012'
-					# this is a hacky sort of thing...
-					output_filename = os.path.join( output_path, '_'.join([ '_'.join( os.path.splitext( os.path.basename( fn ) )[0].split( '_' )[:-1] ), str(begin_year), str(end_year)]) + '.nc' )
+
+					# a handler for the historical (1900-2005) and the modeled (2006-2100) filebnameing
+					if '_historical_' in os.path.basename( fn ):
+						begin_year_fnout = '190001'
+						end_year_fnout = '200512'
+					else:
+						begin_year_fnout = '200601'
+						end_year_fnout = '210012'
+
+					# this is a hacky sort of thing... but we need a way to output the [proper] naming convention
+					output_filename = os.path.join( output_path, '_'.join([ '_'.join( os.path.splitext( os.path.basename( fn ) )[0].split( '_' )[:-1] ), begin_year_fnout, end_year_fnout + '.nc' )
 
 					# this logic can be fine tuned to subset the data down to only the files we need
 					# for this project it is 1900-2100.
@@ -161,9 +175,6 @@ if __name__ == '__main__':
 
 					print files
 					print '\n'
-
-					if not os.path.exists( os.path.dirname( output_filename ) ):
-						os.makedirs( os.path.dirname( output_filename ) )
 					
 					# run the concatenation and the output to a new netcdf file
 					concat_to_nc( files, output_filename, dim='time', begin_time=begin_year[:4], end_time=end_year[:4] )
