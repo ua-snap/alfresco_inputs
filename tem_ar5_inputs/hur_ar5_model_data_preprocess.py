@@ -248,4 +248,4 @@ if __name__ == '__main__':
 # os.chdir( '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/CODE/tem_ar5_inputs' )
 # for model in models:
 # 	for variable in variables:
-# 		os.system( ' '.join(['python -i ','hur_ar5_model_data_preprocess.py','-p', base_path, '-m', model, '-v', variable]) )
+# 		os.system( ' '.join(['python','hur_ar5_model_data_preprocess.py','-p', base_path, '-m', model, '-v', variable]) )
