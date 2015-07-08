@@ -102,87 +102,150 @@ def concat_to_nc( filelist, output_filename, dim='time', begin_time=None, end_ti
 		ds.to_netcdf( output_filename, mode='w', format=nc_format )
 	return output_filename
 
-# # hand processing of a file that exceeds PANDAS DateRange functionality > 2300-07-06 00:00:00, which 
-# # I am going to put a bug report in about
-# fn = '/workspace/Shared/Tech_Projects/ESGF_Data_Access/project_data/data/cmip5/output1/IPSL/IPSL-CM5A-LR/rcp26/mon/atmos/Amon/r1i1p1/v20120114/tas/tas_Amon_IPSL-CM5A-LR_rcp26_r1i1p1_200601-230012.nc'
-# ds = xray.open_dataset( fn )
-# fn_split = os.path.splitext( os.path.basename( fn ) )[0].split( '_' )
-# begin_time, end_time = fn_split[ len( fn_split ) - 1 ].split( '-' )
+def year_greater_yearlimit_workaround( xray_dataset, desired_year_begin, desired_year_end, file_year_begin, file_year_end ):
+	'''
+	very specific function to deal with an issue in how PANDAS deals with datetime.
+	its max datetime value in 64-bit nanoseconds from somewhere near year 1100, ends
+	in roughly 2200.  This is not very ideal for working with some model outputs that
+	put the data in files ranging from 2006-2300.  Soo this workaround solves the issue
+	by subsetting the data using some desired years (it is assumed 12 month FULL years)
+	to subset to these data ranges and return a new xray.dataset.
 
-# begin_idx = 0
-# end_idx = np.repeat( range( 2006, 2300+1), 12 ).tolist()[(int(end_year[:4]) - int(end_time[:4]))]
+	PANDAS date_range functionality < 2300-07-06 00:00:00
 
-# variable = [str] abbreviated name of the variable being converted. i.e 'tas'/'pr'/'hur'
+
+	PARAMETERS:
+	-----------
+	ds = xray.Dataset object with year values outside the time limits of the package -- PANDAS
+	desired_year_begin = [int] 4 digit year begin
+	desired_year_end = [int] 4 digit year end
+	file_year_begin = [int] 4 digit year begin in file
+	file_year_end = [int] 4 digit year end in file
+
+	RETURNS:
+	--------
+	new xray.Dataset object subset to the years of interest using integer indexing instead of year 
+	slicing with strings.
+	'''
+	years = np.repeat(range( file_year_begin, file_year_end+1 ), 12 ) # 12 is for 12 months
+	year_min = min( years )
+
+	if desired_year_begin < year_min:
+		begin_idx = ( year_min - desired_year_begin )
+	else:
+		begin_idx = np.min( np.where(years == desired_year_begin ))
+
+	end_idx = np.max( np.where( years == desired_year_end ))
+	return xray_dataset[ dict( time=range( begin_idx, end_idx + 1 ) ) ]
+
 if __name__ == '__main__':
 	import os, sys, re, glob, xray
 	import numpy as np
 	import pandas as pd
+	import argparse
 
-	# models = [ 'GISS-E2-R','IPSL-CM5A-LR', 'MRI-CGCM3', 'CCSM4', 'GFDL-CM3' ]
-	models = [ 'CCSM4' ]
-	variables = [ 'tas', 'hur' ]
-	base_path = '/workspace/Shared/Tech_Projects/ESGF_Data_Access/project_data/data'
+	# parse the commandline arguments
+	parser = argparse.ArgumentParser( description='preprocess cmip5 input netcdf files to a common type and single files' )
+	parser.add_argument( "-p", "--base_path", action='store', dest='base_path', type=str, help="path to parent directory with a subdirector(ies)y storing the data" )
+	parser.add_argument( "-m", "--model", action='store', dest='model', type=str, help="string of the model name to use in the filename search i.e 'GISS-E2-R', 'IPSL-CM5A-LR',..." )
+	parser.add_argument( "-v", "--variable", action='store', dest='variable', type=str, help="string of the variable name to use in the filename search i.e. 'tas', 'hur',..." )
 
-	# problem_files
+	# parse and unpack args
+	args = parser.parse_args()
+	model = args.model
+	variable = args.variable
+	base_path = args.base_path
+
+	# start an error log for any problem files
 	output_base_path = os.path.join( base_path, 'prepped' )
 	if not os.path.exists( output_base_path ):
 		os.makedirs( output_base_path )
 
 	problem_files_log = open( os.path.join( output_base_path, 'error_files.txt' ), mode='w' )
 
-	for model in models:
-		for variable in variables:
-			fn_prefix_filter = variable + '_*' + model + '*'
-			file_groups = group_input_filenames( fn_prefix_filter, os.path.join( base_path, 'cmip5' ) )
-			for files in file_groups.values():
-				try:
-					files = sorted( files.tolist() )
-					output_path = os.path.join( output_base_path, model, variable )
+	fn_prefix_filter = variable + '_*' + model + '*'
+	file_groups = group_input_filenames( fn_prefix_filter, os.path.join( base_path, 'cmip5' ) )
+	for files in file_groups.values():
+		try:
+			files = sorted( files.tolist() )
 
-					if not os.path.exists( os.path.dirname( output_path ) ):
-						os.makedirs( os.path.dirname( output_path ) )
+			fn = files[ 0 ]
+			# model = get_modelname( fn )
+			output_path = os.path.join( output_base_path, model, variable )
+			begin_year ='185001' # hardwired
+			end_year = '210012' # hardwired
 
-					fn = files[ 0 ]
-					model = get_modelname( fn )
-					begin_year ='190001'
-					end_year = '210012'
+			# a handler for the historical (1850-2005) and the modeled (2006-2100) naming
+			if 'historical' in os.path.basename( fn ):
+				begin_year_fnout = '185001' # hardwired
+				end_year_fnout = '200512' # hardwired
+			else:
+				begin_year_fnout = '200601' # hardwired
+				end_year_fnout = '210012' # hardwired
 
-					# a handler for the historical (1900-2005) and the modeled (2006-2100) filebnameing
-					if '_historical_' in os.path.basename( fn ):
-						begin_year_fnout = '190001'
-						end_year_fnout = '200512'
-					else:
-						begin_year_fnout = '200601'
-						end_year_fnout = '210012'
+			# this logic can be fine tuned to subset the data down to only the files we need
+			# for this project it is 1850-2100.
+			df = pd.DataFrame([ get_file_years(fn) for fn in files ])
 
-					# this is a hacky sort of thing... but we need a way to output the [proper] naming convention
-					output_filename = os.path.join( output_path, '_'.join([ '_'.join( os.path.splitext( os.path.basename( fn ) )[0].split( '_' )[:-1] ), begin_year_fnout, end_year_fnout + '.nc' )
+			# this is the way to interrogate that dataframe for the values we want
+			df = df.astype( int )
+			begin_idx = (np.abs(df[0] - int( begin_year ) ) ).argmin()
+			end_idx = (np.abs(df[1] - int( end_year ) ) ).argmin()
 
-					# this logic can be fine tuned to subset the data down to only the files we need
-					# for this project it is 1900-2100.
-					df = pd.DataFrame([ get_file_years(fn) for fn in files ])
+			# return the files between the desired date ranges
+			if begin_idx == end_idx:
+				files = [ files[ begin_idx ] ]
+			else:
+				files = files[ begin_idx:end_idx + 1 ]
 
-					# this is the way to interrogate that dataframe for the values we want
-					df = df.astype( int )
-					begin_idx = (np.abs(df[0].astype( int ) - int( begin_year ) ) ).argmin()
-					end_idx = (np.abs(df[1].astype( int ) - int( end_year ) ) ).argmin()
+			print files
+			print '\n'
 
-					# return the files between the desired date ranges
-					if begin_idx == end_idx:
-						files = [files[ begin_idx ]]
-					else:
-						files = files[ begin_idx:end_idx + 1 ]
+			begin_year_in = str(df.ix[ begin_idx ][0])
+			end_year_in = str(df.ix[ end_idx ][1])
 
-					print files
-					print '\n'
-					
-					# run the concatenation and the output to a new netcdf file
-					concat_to_nc( files, output_filename, dim='time', begin_time=begin_year[:4], end_time=end_year[:4] )
+			# set up some vars for the output naming standardization
+			cmor_table = os.path.splitext( os.path.basename( fn ) )[ 0 ].split( '_' )[ 1 ]
+			experiment = scenario = os.path.splitext( os.path.basename( fn ) )[ 0 ].split( '_' )[ -2 ]
+			scenario = os.path.splitext( os.path.basename( fn ) )[ 0 ].split( '_' )[ -3 ]
 
-				except:
-					print '\n--> ERROR !!!\n\n%s\n\n' % files
-					problem_files_log.writelines( files )
-					pass
+			if not os.path.exists( output_path ):
+				os.makedirs( output_path )
+
+			# run the concatenation and the output to a new netcdf file
+			ds = xray.concat([ xray.open_dataset( i ).load() for i in files ], 'time' )
+			new_ds = year_greater_yearlimit_workaround( ds, int( begin_year_fnout[:4] ), int( end_year_fnout[:4] ), int(str(begin_year_in)[:4]), int(str(end_year_in)[:4]) )
+			begin_year_fnout = str(int(begin_year_fnout[:4]) + (int(begin_year_in[:4]) - int(begin_year_fnout[:4]) )) + '01' # to update the output naming
+			# output name generation
+			new_fn_base = '_'.join([ variable, cmor_table, model, scenario, experiment, begin_year_fnout, end_year_fnout ]) + '.nc'
+			output_filename = os.path.join( output_path, new_fn_base )
+			new_ds.to_netcdf( output_filename, mode='w' )
+			
+			# cleanup
+			ds.close()
+			ds = None
+			new_ds.close()
+			new_ds = None
+			
+			# legacy version of file concatenation that is not ready for prime-time due to the quirky nature of the xray library
+			# in its young state.
+			# concat_to_nc( files, output_filename, dim='time', begin_time=begin_year[:4], end_time=end_year[:4] )
+		except:
+			print '\n--> ERROR !!!\n\n%s\n\n' % files
+			problem_files_log.writelines( files )
+			pass
 
 	problem_files_log.close()
 
+
+# EXAMPLE OF USE:
+
+# some setup
+# import os
+# models = [ 'GISS-E2-R', 'IPSL-CM5A-LR', 'MRI-CGCM3', 'CCSM4', 'GFDL-CM3' ]
+# variables = [ 'tas', 'hur' ]
+# base_path = '/workspace/Shared/Tech_Projects/ESGF_Data_Access/project_data/data'
+# os.chdir( '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/CODE/tem_ar5_inputs' )
+# for model in models:
+# 	for variable in variables:
+# 		os.system( ' '.join(['python -i ','hur_ar5_model_data_preprocess.py','-p', base_path, '-m', model, '-v', variable]) )
