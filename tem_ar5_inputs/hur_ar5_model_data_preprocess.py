@@ -163,8 +163,10 @@ if __name__ == '__main__':
 
 	problem_files_log = open( os.path.join( output_base_path, 'error_files.txt' ), mode='w' )
 
+	# make some filters and filter the files we want into groups
 	fn_prefix_filter = variable + '_*' + model + '*'
 	file_groups = group_input_filenames( fn_prefix_filter, os.path.join( base_path, 'cmip5' ) )
+	
 	for files in file_groups.values():
 		try:
 			files = sorted( files.tolist() )
