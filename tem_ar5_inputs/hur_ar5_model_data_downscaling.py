@@ -93,6 +93,7 @@ if __name__ == '__main__':
 	climatology_end = '1990-12-31'
 	plev = 16 # this is also a None default!
 	cru_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_ts20/akcan'
+	anomalies_calc_type = 'proportional'
 
 	# upack argparse'd inputs from the command line
 
@@ -137,8 +138,14 @@ if __name__ == '__main__':
 
 	# generate climatology / anomalies
 	climatology = ds.loc[ climatology_begin:climatology_end ].groupby( 'time.month' ).mean( 'time' )
-	# RIGHT NOW THIS IS NOT THE PROPORTIONAL ANOMALY !!! THIS NEEDS TO BE A SWITCH TO DEAL WITH PROPORTION OR ABSOLUTE DIFF
-	anomalies = ds.groupby( 'time.month' ) - climatology # anomalies = ds.groupby( 'time.month' ) / climatology
+	
+	# deal with different anomaly calculation types
+	if anomalies_calc_type == 'absolute':
+		anomalies = ds.groupby( 'time.month' ) - climatology
+	elif anomalies_calc_type == 'proportional':
+		anomalies = ds.groupby( 'time.month' ) / climatology
+	else:
+		NameError( 'anomalies_calc_type can only be one of "absolute" or "proportional"' )
 
 	# some setup of the output raster metadata
 	time_len, rows, cols = anomalies.shape
