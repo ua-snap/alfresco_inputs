@@ -166,7 +166,7 @@ if __name__ == '__main__':
 	# make some filters and filter the files we want into groups
 	fn_prefix_filter = variable + '_*' + model + '*'
 	file_groups = group_input_filenames( fn_prefix_filter, os.path.join( base_path, 'cmip5' ) )
-	
+
 	for files in file_groups.values():
 		try:
 			files = sorted( files.tolist() )
@@ -215,7 +215,14 @@ if __name__ == '__main__':
 				os.makedirs( output_path )
 
 			# run the concatenation and the output to a new netcdf file
-			ds = xray.concat([ xray.open_dataset( i ).load() for i in files ], 'time' )
+			# and we are writing in a hack to get around the darn issue with GFDL-CM3
+			# we could just run them all with the reduce workaround, but I will keep both 
+			# in hopes that the library improves.
+			if 'GFDL' in model:
+				ds = reduce( lambda x,y: xray.concat( [x,y], 'time'), (xray.open_dataset( i ) for i in files) )
+			else:
+				ds = xray.concat([ xray.open_dataset( i ).load() for i in files ], 'time' )
+			
 			new_ds = year_greater_yearlimit_workaround( ds, int( begin_year_fnout[:4] ), int( end_year_fnout[:4] ), int(str(begin_year_in)[:4]), int(str(end_year_in)[:4]) )
 			begin_year_fnout = str(int(begin_year_fnout[:4]) + (int(begin_year_in[:4]) - int(begin_year_fnout[:4]) )) + '01' # to update the output naming
 			# output name generation
@@ -239,9 +246,7 @@ if __name__ == '__main__':
 
 	problem_files_log.close()
 
-
 # EXAMPLE OF USE:
-
 # some setup
 # import os
 # models = [ 'GISS-E2-R', 'IPSL-CM5A-LR', 'MRI-CGCM3', 'CCSM4', 'GFDL-CM3' ]
