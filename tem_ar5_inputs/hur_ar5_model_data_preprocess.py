@@ -215,9 +215,9 @@ if __name__ == '__main__':
 				os.makedirs( output_path )
 
 			# run the concatenation and the output to a new netcdf file
-			# and we are writing in a hack to get around the darn issue with GFDL-CM3
-			# we could just run them all with the reduce workaround, but I will keep both 
-			# in hopes that the library improves.
+			# --> and we are writing in a hack to get around the darn issue with GFDL-CM3
+			#   we could just run them all with the reduce workaround, but I will keep both 
+			#   in hopes that the library improves.
 			if 'GFDL' in model:
 				ds = reduce( lambda x,y: xray.concat( [x,y], 'time'), (xray.open_dataset( i ) for i in files) )
 			else:
