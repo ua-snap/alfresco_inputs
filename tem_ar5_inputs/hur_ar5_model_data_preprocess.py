@@ -101,7 +101,6 @@ def concat_to_nc( filelist, output_filename, dim='time', begin_time=None, end_ti
 			os.remove( output_filename )
 		ds.to_netcdf( output_filename, mode='w', format=nc_format )
 	return output_filename
-
 def year_greater_yearlimit_workaround( xray_dataset, desired_year_begin, desired_year_end, file_year_begin, file_year_end ):
 	'''
 	very specific function to deal with an issue in how PANDAS deals with datetime.

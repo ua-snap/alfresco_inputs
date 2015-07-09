@@ -181,7 +181,7 @@ if __name__ == '__main__':
 
 	# this is effectively working
 	cru_stack = [ rasterio.open( fn ).read( 1 ) for fn in cru_files ]
-	cru_gen = cru_generator( 1271, cru_stack ) # should 1271 be len(cru_files?)
+	cru_gen = cru_generator( 1271, cru_stack ) # should 1271 be len(cru_stack)??
 
 	# run in parallel
 	pool = mp.Pool( 10 )
