@@ -74,6 +74,7 @@ if __name__ == '__main__':
 	import os, sys, re, xray, rasterio, glob, argparse
 	from rasterio import Affine as A
 	from rasterio.warp import reproject, RESAMPLING
+	# import matplotlib
 	from mpl_toolkits.basemap import shiftgrid, addcyclic
 	from pathos import multiprocessing as mp
 
@@ -88,10 +89,23 @@ if __name__ == '__main__':
 	parser.add_argument( "-cet", "--climatology_end_time", nargs='?', const='199012', action='store', dest='climatology_end', type=str, help="string in format YYYYMM or YYYY of the ending month and potentially (year) of the climatology period" )
 	parser.add_argument( "-plev", "--plev", nargs='?', const=None, action='store', dest='plev', type=int, help="integer value (in millibars) of the desired pressure level to extract, if there is one." )
 	parser.add_argument( "-cru", "--cru_path", action='store', dest='cru_path', type=str, help="path to the directory storing the cru climatology data derived from CL2.0" )
-	parser.add_argument( "-at", "--anomalies_calc_type", nargs='?', const='absolute', action='store', dest='anomalies_calc_type', type=int, help="string of 'proportional' or 'absolute' to inform of anomalies calculation type to perform." )
+	parser.add_argument( "-at", "--anomalies_calc_type", nargs='?', const='absolute', action='store', dest='anomalies_calc_type', type=str, help="string of 'proportional' or 'absolute' to inform of anomalies calculation type to perform." )
 
-	# parse and unpack args
+	# parse args
 	args = parser.parse_args()
+
+	# unpack args
+	modeled_fn = args.modeled_fn
+	historical_fn = args.historical_fn
+	output_dir = args.output_dir
+	begin_time = args.begin_time
+	end_time = args.end_time
+	climatology_begin = args.climatology_begin
+	climatology_end = args.climatology_end
+	plev = args.plev
+	cru_path = args.cru_path
+	anomalies_calc_type = args.anomalies_calc_type
+
 
 	# * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 	# [NOTE]: hardwired raster metadata meeting the ALFRESCO Model's needs for 
@@ -107,17 +121,23 @@ if __name__ == '__main__':
 				'dtype': 'float32',
 				'height': 1186,
 				'nodata': -3.4e+38,
-				'transform': (-2173223.206087799, 2000.0, 0.0,
-					2548412.932644147,0.0,-2000.0),
 				'width': 3218,
 				'compress':'lzw'}
+					# 			'transform': (-2173223.206087799, 2000.0, 0.0,
+					# 2548412.932644147,0.0,-2000.0),
 	# output template numpy array same dimensions as the template
 	dst = np.empty( (1186, 3218) )
 	
 	# * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 	# condition to deal with reading in historical data if needed.
 	if modeled_fn is not None and historical_fn is not None:
-		# read in both
+		# parse the input name for some file metadata
+		output_naming_dict = standardized_fn_to_vars( modeled_fn )
+
+		# this is to maintain cleanliness
+		variable = output_naming_dict[ 'variable' ]
+
+		# read in both modeled and historical
 		ds = xray.open_dataset( modeled_fn )
 		ds = ds[ variable ].load()
 		clim_ds = xray.open_dataset( historical_fn )
@@ -125,17 +145,20 @@ if __name__ == '__main__':
 		# generate climatology / anomalies
 		clim_ds = clim_ds.loc[ {'time':slice(climatology_begin,climatology_end)} ]
 		climatology = clim_ds.groupby( 'time.month' ).mean( 'time' )
-		# parse the input name for some file metadata
-		output_naming_dict = standardized_fn_to_vars( modeled_fn )
+		del clim_ds
 	elif historical_fn is not None:
+		# parse the input name for some file metadata
+		output_naming_dict = standardized_fn_to_vars( historical_fn )
+		
+		# this is to maintain cleanliness
+		variable = output_naming_dict[ 'variable' ]
+
 		# read in historical
 		ds = xray.open_dataset( historical_fn )
 		ds = ds[ variable ].load()
 		# generate climatology / anomalies
 		climatology = ds.loc[ {'time':slice(climatology_begin,climatology_end)} ]
 		climatology = climatology.groupby( 'time.month' ).mean( 'time' )
-		# parse the input name for some file metadata
-		output_naming_dict = standardized_fn_to_vars( historical_fn )
 	else:
 		NameError( 'ERROR: must have both modeled_fn and historical_fn, or just historical_fn' )
 
@@ -171,12 +194,11 @@ if __name__ == '__main__':
 				'driver':'GTiff',
 				'dtype':np.float32,
 				'count':time_len,
-				'transform':affine.to_gdal(),
 				'compress':'lzw' }
-
+				#'transform':affine.to_gdal(),
 	# build some filenames for the outputs to be generated
 	months = [ '01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12' ]
-	years = [ str(year) for year in range( int(time_begin[:4]), int(time_end[:4]) + 1, 1 ) ]
+	years = [ str(year) for year in range( int(begin_time[:4]), int(end_time[:4]) + 1, 1 ) ]
 	# combine the months and the years
 	combinations = [ (month, year) for year in years for month in months ]
 	output_filenames = [ os.path.join( output_dir, '_'.join([output_naming_dict['variable'], 'metric', output_naming_dict['model'], output_naming_dict['scenario'], output_naming_dict['experiment'], month, year]) + '.tif' ) for month, year in combinations ]
@@ -189,7 +211,7 @@ if __name__ == '__main__':
 	cru_gen = cru_generator( len(output_filenames), cru_stack )
 
 	# cleanup some uneeded vars that are hogging RAM
-	del clim_ds, climatology, ds, anomalies
+	del climatology, ds, anomalies
 
 	# run in parallel using PATHOS
 	pool = mp.Pool( 8 )
@@ -200,7 +222,7 @@ if __name__ == '__main__':
 
 
 # # # # # # # # # SOME TESTING AND EXAMPLE GENERATION AREA # # # # # # # # # 
-# # some setup pathing <<-- THIS TO BE CONVERTED TO ARGUMENTS AT COMMAND LINE
+# some setup pathing <<-- THIS TO BE CONVERTED TO ARGUMENTS AT COMMAND LINE
 # historical_fn = '/workspace/Shared/Tech_Projects/ESGF_Data_Access/project_data/data/prepped/GFDL-CM3/hur/hur_Amon_GFDL-CM3_historical_r1i1p1_186001_200512.nc' 
 # modeled_fn = '/workspace/Shared/Tech_Projects/ESGF_Data_Access/project_data/data/prepped/GFDL-CM3/hur/hur_Amon_GFDL-CM3_rcp26_r1i1p1_200601_210012.nc' 
 
@@ -215,28 +237,3 @@ if __name__ == '__main__':
 # cru_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_ts20/akcan'
 # anomalies_calc_type = 'proportional'
 
-# import os
-
-# base_dir = '/workspace/Shared/Tech_Projects/ESGF_Data_Access/project_data/data/prepped'
-# output_base_dir = ''
-# for root, dirs, files in os.walk( base_dir ):
-# 	# split out the sub_dirs to have both model_name and variable folder hierarchy
-# 	output_dir = os.path.join( output_base_dir, model, variable )
-	
-# 	if not os.path.exists( output_dir ):
-# 		os.makedirs( output_dir )
-
-# 	if files:
-# 		for fn in files:
-# 			if 'historical' in fn:
-# 				# run with only the historical file
-# 				# cru_path will need to be somewhat dynamic here since we have tas and hur...
-# 				# same goes for anomalies calculation type...  this is diff for tas and hur...
-# 				os.system( 'python hur_ar5_model_data_downscaling.py' + ' -hi ' + fn + ' -o ' + output_dir + ' -bt ' + '190101' + ' -et ' + '200512' + ' -cbt ' + '196101' + ' -cet ' + '199012' + ' -plev ' + 1000 + ' -cru ' + + ' -at ' + )
-# 			else:
-# 				# grab the historical file from that particular folder
-# 				historical_fn = glob.glob( os.path.join( root, '*'.join([ 'historical', '.nc' ] ) )[0]
-# 				# run with both historical and modeled files for anomalies calc.
-# 				# cru_path will need to be somewhat dynamic here since we have tas and hur...
-# 				# same goes for anomalies calculation type...  this is diff for tas and hur...
-# 				os.system( 'python hur_ar5_model_data_downscaling.py' + ' -mi ' + fn + ' -hi ' + historical_fn + ' -o ' + output_dir + ' -bt ' + '200601' + ' -et ' + '210012' + ' -cbt ' + '196101' + ' -cet ' + '199012' + ' -plev ' + 1000 + ' -cru ' + + ' -at ' + )
