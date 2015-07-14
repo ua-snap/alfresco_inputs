@@ -74,7 +74,6 @@ if __name__ == '__main__':
 	import os, sys, re, xray, rasterio, glob, argparse
 	from rasterio import Affine as A
 	from rasterio.warp import reproject, RESAMPLING
-	# import matplotlib
 	from mpl_toolkits.basemap import shiftgrid, addcyclic
 	from pathos import multiprocessing as mp
 
@@ -123,8 +122,7 @@ if __name__ == '__main__':
 				'nodata': -3.4e+38,
 				'width': 3218,
 				'compress':'lzw'}
-					# 			'transform': (-2173223.206087799, 2000.0, 0.0,
-					# 2548412.932644147,0.0,-2000.0),
+
 	# output template numpy array same dimensions as the template
 	dst = np.empty( (1186, 3218) )
 	
@@ -146,7 +144,7 @@ if __name__ == '__main__':
 		clim_ds = clim_ds.loc[ {'time':slice(climatology_begin,climatology_end)} ]
 		climatology = clim_ds.groupby( 'time.month' ).mean( 'time' )
 		del clim_ds
-	elif historical_fn is not None:
+	elif historical_fn is not None and modeled_fn is None:
 		# parse the input name for some file metadata
 		output_naming_dict = standardized_fn_to_vars( historical_fn )
 		
@@ -195,7 +193,6 @@ if __name__ == '__main__':
 				'dtype':np.float32,
 				'count':time_len,
 				'compress':'lzw' }
-				#'transform':affine.to_gdal(),
 	# build some filenames for the outputs to be generated
 	months = [ '01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12' ]
 	years = [ str(year) for year in range( int(begin_time[:4]), int(end_time[:4]) + 1, 1 ) ]
@@ -237,3 +234,15 @@ if __name__ == '__main__':
 # cru_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_ts20/akcan'
 # anomalies_calc_type = 'proportional'
 
+
+# unpack args
+modeled_fn = '/workspace/Shared/Tech_Projects/ESGF_Data_Access/project_data/data/prepped/GFDL-CM3/hur/hur_Amon_GFDL-CM3_rcp26_r1i1p1_200601_210012.nc'
+historical_fn = '/workspace/Shared/Tech_Projects/ESGF_Data_Access/project_data/data/prepped/GFDL-CM3/hur/hur_Amon_GFDL-CM3_historical_r1i1p1_186001_200512.nc'
+output_dir = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/downscaled'
+begin_time = '2006-01'
+end_time = '2100-12'
+climatology_begin = '1961-01'
+climatology_end = '1990-12'
+plev = 1000
+cru_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_ts20/akcan/hur'
+anomalies_calc_type = 'proportional'
