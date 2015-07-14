@@ -81,7 +81,6 @@ if __name__ == '__main__':
 	parser = argparse.ArgumentParser( description='preprocess cmip5 input netcdf files to a common type and single files' )
 	parser.add_argument( "-mi", "--modeled_fn", nargs='?', const=None, action='store', dest='modeled_fn', type=str, help="path to modeled input filename (NetCDF); default:None" )
 	parser.add_argument( "-hi", "--historical_fn", nargs='?', const=None, action='store', dest='historical_fn', type=str, help="path to historical input filename (NetCDF); default:None" )
-
 	parser.add_argument( "-o", "--output_dir", action='store', dest='output_dir', type=str, help="string path to the output folder containing the new downscaled outputs" )
 	parser.add_argument( "-bt", "--begin_time", action='store', dest='begin_time', type=str, help="string in format YYYYMM of the beginning month/year" )
 	parser.add_argument( "-et", "--end_time", action='store', dest='end_time', type=str, help="string in format YYYYMM of the ending month/year" )
@@ -200,7 +199,7 @@ if __name__ == '__main__':
 	pool.close()
 
 
-# # # # # # # # #SOME TESTING AND EXAMPLE GENERATION AREA # # # # # # # # # 
+# # # # # # # # # SOME TESTING AND EXAMPLE GENERATION AREA # # # # # # # # # 
 # # some setup pathing <<-- THIS TO BE CONVERTED TO ARGUMENTS AT COMMAND LINE
 # historical_fn = '/workspace/Shared/Tech_Projects/ESGF_Data_Access/project_data/data/prepped/GFDL-CM3/hur/hur_Amon_GFDL-CM3_historical_r1i1p1_186001_200512.nc' 
 # modeled_fn = '/workspace/Shared/Tech_Projects/ESGF_Data_Access/project_data/data/prepped/GFDL-CM3/hur/hur_Amon_GFDL-CM3_rcp26_r1i1p1_200601_210012.nc' 
@@ -216,4 +215,28 @@ if __name__ == '__main__':
 # cru_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_ts20/akcan'
 # anomalies_calc_type = 'proportional'
 
+# import os
 
+# base_dir = '/workspace/Shared/Tech_Projects/ESGF_Data_Access/project_data/data/prepped'
+# output_base_dir = ''
+# for root, dirs, files in os.walk( base_dir ):
+# 	# split out the sub_dirs to have both model_name and variable folder hierarchy
+# 	output_dir = os.path.join( output_base_dir, model, variable )
+	
+# 	if not os.path.exists( output_dir ):
+# 		os.makedirs( output_dir )
+
+# 	if files:
+# 		for fn in files:
+# 			if 'historical' in fn:
+# 				# run with only the historical file
+# 				# cru_path will need to be somewhat dynamic here since we have tas and hur...
+# 				# same goes for anomalies calculation type...  this is diff for tas and hur...
+# 				os.system( 'python hur_ar5_model_data_downscaling.py' + ' -hi ' + fn + ' -o ' + output_dir + ' -bt ' + '190101' + ' -et ' + '200512' + ' -cbt ' + '196101' + ' -cet ' + '199012' + ' -plev ' + 1000 + ' -cru ' + + ' -at ' + )
+# 			else:
+# 				# grab the historical file from that particular folder
+# 				historical_fn = glob.glob( os.path.join( root, '*'.join([ 'historical', '.nc' ] ) )[0]
+# 				# run with both historical and modeled files for anomalies calc.
+# 				# cru_path will need to be somewhat dynamic here since we have tas and hur...
+# 				# same goes for anomalies calculation type...  this is diff for tas and hur...
+# 				os.system( 'python hur_ar5_model_data_downscaling.py' + ' -mi ' + fn + ' -hi ' + historical_fn + ' -o ' + output_dir + ' -bt ' + '200601' + ' -et ' + '210012' + ' -cbt ' + '196101' + ' -cet ' + '199012' + ' -plev ' + 1000 + ' -cru ' + + ' -at ' + )
