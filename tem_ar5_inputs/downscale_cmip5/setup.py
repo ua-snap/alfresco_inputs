@@ -4,8 +4,7 @@ dependencies_list = [ 'xray','rasterio','pandas','numpy','rasterio','pathos' ]
 
 scripts_list = ['bin/downscaling_launcher.py',
 				 'bin/hur_ar5_model_data_downscaling.py',
-				 'bin/hur_ar5_model_data_preprocess.py',
-				 'bin/tem_relativehumidity_downscaling_ar5.py']
+				 'bin/hur_ar5_model_data_preprocess.py']
 
 classifiers = [
 		# How mature is this project? Common values are
