@@ -1,6 +1,6 @@
 from setuptools import setup
 
-dependencies_list = [ 'xray','rasterio','glob','pandas','numpy','rasterio','pathos' ]
+dependencies_list = [ 'xray','rasterio','pandas','numpy','rasterio','pathos' ]
 
 scripts_list = ['bin/downscaling_launcher.py',
 				 'bin/hur_ar5_model_data_downscaling.py',
