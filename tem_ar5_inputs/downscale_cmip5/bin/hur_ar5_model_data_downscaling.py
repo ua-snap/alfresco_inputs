@@ -1,3 +1,5 @@
+#!/usr/bin/python2
+
 # # # # #
 # Tool to downscale the CMIP5 data from the PCMDI group. 
 # # # # #
