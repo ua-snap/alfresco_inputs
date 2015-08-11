@@ -1,4 +1,10 @@
-# pre-processing area
+#!/usr/bin/python2
+
+# #
+# pre-processing of raw downloaded CMIP5 data from the PCMDI portal to something that is standardized for 
+# use in later downscaling to ALFRESCO AK/Canada extent and resolution needs.
+# # # # # 
+
 def group_input_filenames( prefix, root_dir ):
 	import fnmatch, functools, itertools, os, glob
 	import pandas as pd
