@@ -1,5 +1,59 @@
+# # #
+# Current implementation of the cru ts31 (ts32) delta downscaling procedure
+#
+# Author: Michael Lindgren (malindgren@alaska.edu)
+# # #
 import numpy as np
+def write_gtiff( output_arr, template_meta, output_filename, compress=True ):
+	'''
+	DESCRIPTION:
+	------------
+	output a GeoTiff given a numpy ndarray, rasterio-style 
+	metadata dictionary, and and output_filename.
 
+	If a multiband file is to be processed, the Longitude
+	dimension is expected to be the right-most. 
+	--> dimensions should be (band, latitude, longitude)
+
+	ARGUMENTS:
+	----------
+	output_arr = [numpy.ndarray] with longitude as the right-most dimension
+	template_meta = [dict] rasterio-style raster meta dictionary.  Typically 
+		found in a template raster by: rasterio.open( fn ).meta
+	output_filename = [str] path to and name of the output GeoTiff to be 
+		created.  currently only 'GTiff' is supported.
+	compress = [bool] if True (default) LZW-compression is applied to the 
+		output GeoTiff.  If False, no compression is applied.
+		* this can also be added (along with many other gdal creation options)
+		to the template meta as a key value pair template_meta.update( compress='lzw' ).
+		See Rasterio documentation for more details. This is just a common one that is 
+		supported here.
+
+	RETURNS:
+	--------
+	string path to the new output_filename created
+
+	'''
+	import os
+	if 'transform' in template_meta.keys():
+		_ = template_meta.pop( 'transform' )
+	if not output_filename.endswith( '.tif' ):
+		UserWarning( 'output_filename does not end with ".tif", it has been fixed for you.' )
+		output_filename = os.path.splitext( output_filename )[0] + '.tif'
+	if output_arr.ndim > 2:
+		nbands = output_arr.shape[0]
+	elif output_arr.ndim == 2:
+		nbands = 1
+	else:
+		raise ValueError( 'output_arr must have at least 2 dimensions' )
+	if template_meta[ 'count' ] != nbands:
+		raise ValueError( 'template_meta[ "count" ] must match output_arr bands' )
+	if compress == True and 'compress' not in template_meta.keys():
+		template_meta.update( compress=lzw )
+	with rasterio.open( output_filename, 'w', **template_meta ) as out:
+		for band in range( 1, nbands+1 ):
+			out.write( output_arr[ band, ... ], band )
+	return output_filename
 def shiftgrid(lon0,datain,lonsin,start=True,cyclic=360.0):
 	import numpy as np
 	"""
@@ -80,8 +134,8 @@ def padded_bounds( rst, npixels, crs ):
 
 	resolution = rst.res[0]
 	new_bounds = [ bound+(expand*resolution) for bound, expand in zip( rst.bounds, npixels ) ]
+	# new_ext = bounds_to_extent( new_bounds )
 	return new_bounds
-	
 def xyz_to_grid( x, y, z, grid, method='cubic', output_dtype=np.float32 ):
 	'''
 	interpolate points to a grid. simple wrapper around
@@ -100,16 +154,41 @@ def xyz_to_grid( x, y, z, grid, method='cubic', output_dtype=np.float32 ):
 	zi = griddata( (x, y), z, grid, method=method )
 	zi = np.flipud( zi.astype( output_dtype ) )
 	return zi
-def run( args ):
-	''' 
-	simple function wrapper for unpacking an argument dict 
-	to the downscale function for getting around the single 
-	argument pass to multiprocessing.map implementation issue.
+def run( df, meshgrid_tuple, lons_pcll, template_raster_fn, src_transform, src_crs, src_nodata, output_filename ):
 	'''
-	return( downscale( **args ) )
+	run the interpolation to a grid, and reprojection / resampling to the Alaska / Canada rasters
+	extent, resolution, origin (template_raster).
+
+	This function is intended to be used to run a pathos.multiprocessing Pool's map function
+	across a list of pre-computed arguments.
+			
+	RETURNS:
+
+	[str] path to the output filename generated
+
+	'''
+	template_raster = rasterio.open( template_raster_fn )
+	interp_arr = xyz_to_grid( np.array(df['lon'].tolist()), \
+					np.array(df['lat'].tolist()), \
+					np.array(df['anom'].tolist()), grid=meshgrid_tuple, method='cubic' ) 
+
+	src_nodata = -9999.0 # nodata
+	interp_arr[ np.isnan( interp_arr ) ] = src_nodata
+	dat, lons = shiftgrid( 180., interp_arr, lons_pcll, start=False )
+	output_arr = np.empty_like( template_raster.read( 1 ) )
+	template_meta = template_raster.meta
+
+	if 'transform' in template_meta.keys():
+		template_meta.pop( 'transform' )
+
+	reproject( dat, output_arr, src_transform=src_transform, src_crs=src_crs, src_nodata=src_nodata, \
+				dst_transform=template_meta['affine'], dst_crs=template_meta['crs'],\
+				dst_nodata=None, resampling=RESAMPLING.nearest, num_threads=1, SOURCE_EXTRA=1000 )	
+	return write_gtiff( output_arr, template_meta, output_filename, compress=True )
 
 if __name__ == '__main__':
-	import rasterio, xray, os, glob
+	import rasterio, xray, os, glob, affine
+	from rasterio.warp import reproject, RESAMPLING
 	import geopandas as gpd
 	import pandas as pd
 	import numpy as np
@@ -117,6 +196,7 @@ if __name__ == '__main__':
 	from shapely.geometry import Point
 	from pathos import multiprocessing as mp
 
+	ncores = 15
 	# filenames
 	base_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data'
 	cld_ts31 = '/Data/Base_Data/Climate/World/CRU_grids/CRU_TS31/cru_ts_3_10.1901.2009.cld.dat.nc'
@@ -125,9 +205,16 @@ if __name__ == '__main__':
 	cld_ts20 = '' # read in the already pre-produced files.  They should be in 10'...  or maybe I need to change that.
 	climatology_begin = '1961'
 	climatology_end = '1990'
+	year_begin = 1901
+	year_end = 2009
 
 	# open with xray
 	cld_ts31 = xray.open_dataset( cld_ts31 )
+	
+	# open template raster
+	template_raster = rasterio.open( template_raster_fn )
+	template_meta = template_raster.meta
+	template_meta.update( crs={'init':'epsg:3338'} )
 
 	# calculate the anomalies
 	clim_ds = cld_ts31.loc[ {'time':slice(climatology_begin,climatology_end)} ]
@@ -135,168 +222,41 @@ if __name__ == '__main__':
 	anomalies = cld_ts31.cld.groupby( 'time.month' ) / climatology
 
 	# rotate the anomalies to pacific centered latlong -- this is already in the greenwich latlong
-	dat, lons = shiftgrid( 0., anomalies, anomalies.lon )
-
+	dat_pcll, lons_pcll = shiftgrid( 0., anomalies, anomalies.lon.data )
+	
 	# # generate an expanded extent (from the template_raster) to interpolate across
-	# template_raster = rasterio.open( template_raster_fn )
+	template_raster = rasterio.open( template_raster_fn )
 	# output_resolution = (1000.0, 1000.0) # hardwired, but we are building this for IEM which requires 1km
-	# template_meta = template_raster.meta
-
-	# npixels = ( -200, -2000, 200, 200 )
-	# expanded_bounds = padded_bounds( template_raster, npixels, template_raster.crs )
+	template_meta = template_raster.meta
 
 	# # interpolate to a new grid
 	# get longitudes and latitudes using meshgrid
-	lo, la = [ i.ravel() for i in np.meshgrid( lons, cld_ts31.lat ) ]
+	lo, la = [ i.ravel() for i in np.meshgrid( lons_pcll, anomalies.lat ) ] # mesh the lons/lats
 	
 	# convert into GeoDataFrame and drop all the NaNs
-	df_list = [ pd.DataFrame({ 'anom':i.ravel(), 'lat':la, 'lon':lo }).dropna( axis=0, how='any' ) for i in dat ]
-	xi, yi = np.meshgrid( lons, cld_ts31.lat )
+	df_list = [ pd.DataFrame({ 'anom':i.ravel(), 'lat':la, 'lon':lo }).dropna( axis=0, how='any' ) for i in dat_pcll ]
+	xi, yi = np.meshgrid( lons_pcll, anomalies.lat.data )
+	meshgrid_tuple = np.meshgrid( lons_pcll, anomalies.lat.data )
+
+	# run the above function
+	# argument setup
+	meshgrid_tuple = (xi,yi)
+	src_transform = affine.Affine( 0.5, 0.0, -180.0, 0.0, -0.5, 90.0 )
+	src_crs = {'init':'epsg:4326'}
+	src_nodata = -9999.0
+	output_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/OCTOBER'
 	
-	if __name__ == '__main__':
-		# interpolate to the 0.5 degree grid to fill in some areas along the always problematic coastline
-		pool = mp.Pool( 32 )
-		out = pool.map( lambda df: xyz_to_grid( np.array(df['lon'].tolist()), np.array(df['lat'].tolist()), np.array(df['anom'].tolist()), grid=(xi,yi), method='cubic' ) , df_list[:2] )
-		pool.close()
+	# output_filenames setup
+	years = np.arange( year_begin, year_end+1, 1 ).astype( str ).tolist()
+	months = [ i if len(i)==2 else '0'+i for i in np.arange( 1, 12+1, 1 ).astype( str ).tolist() ]
+	month_year = [ (month, year) for year in years for month in months ]
+	output_filenames = [ os.path.join( output_path, '_'.join([ 'cld_pct_cru_ts31',month,year])+'.tif' ) for month, year in month_year ]
 
-	# then restack these things
-	anomalies_interp = np.rollaxis( np.dstack( out ), -1 )
+	args_list = [ {'df':df, 'meshgrid_tuple':meshgrid_tuple, 'lons_pcll':lons_pcll, \
+					'template_raster_fn':template_raster_fn, 'src_transform':src_transform, \
+					'src_crs':src_crs, 'src_nodata':src_nodata, 'output_filename':fn } for df, fn in zip( df_list, output_filenames ) ]
 
-	# rotate back into the Greenwich Centered Latlong
-	anomalies_greenwich, lons = shiftgrid( 180., anomalies_interp, lons, start=False )
-	
-	# for reasons I do not currently understand (or care to figure out) I need to shift these new lons by 0.5 degrees.
-	lons = lons + 0.5
-
-	# cleanup some big objects
-	del out, df_list, anomalies_interp
-	
-	# downscale - which will involves reprojection to the akcan extent and multiplying the relative anomalies to the 
-	#  baseline raster data from CRU CL2.0
-
-	def downscale( src, dst, cru, src_crs, src_affine, dst_crs, dst_affine, output_filename, dst_meta, \
-			method='cubic_spline', operation='add', output_dtype='float32', **kwargs ):
-		'''
-		operation can be one of two keywords for the operation to perform the delta downscaling
-		- keyword strings are one of: 'add'= addition, 'mult'=multiplication, or 'div'=division (not implemented)
-		- method can be one of 'cubic_spline', 'nearest', 'bilinear' and must be input as a string.
-		- output_dtype can be one of 'int32', 'float32'
-		'''
-		from rasterio.warp import reproject, RESAMPLING
-		def add( cru, anom ):
-			return cru + anom
-		def mult( cru, anom ):
-			return cru * anom
-		def div( cru, anom ):
-			# return cru / anom
-			# this one may not be useful, but the placeholder is here 
-			return NotImplementedError
-
-		# switch to deal with numeric output dtypes
-		dtypes_switch = {'int32':np.int32, 'float32':np.float32}
-
-		# switch to deal with different resampling types
-		method_switch = { 'nearest':RESAMPLING.nearest, 'bilinear':RESAMPLING.bilinear, 'cubic_spline':RESAMPLING.cubic_spline }
-		method = method_switch[ method ]
-
-		# reproject src to dst
-		out = np.zeros( dst.shape ) 
-		reproject( src,
-					out,
-					src_transform=src_affine,
-					src_crs=src_crs,
-					dst_transform=dst_affine,
-					dst_crs=dst_crs,
-					resampling=method )
-		# switch to deal with different downscaling operators
-		operation_switch = { 'add':add, 'mult':mult, 'div':div }
-		downscaled = operation_switch[ operation ]( cru, out )
-
-		# this is a geotiff creator so lets pass in the lzw compression
-		dst_meta.update( compress='lzw' )
-		with rasterio.open( output_filename, 'w', **dst_meta ) as out:
-			out.write_band( 1, downscaled.astype( dtypes_switch[ output_dtype ] ).data )
-		return output_filename
-
-
-
-downscale( src, dst, cru, src_crs, src_affine, dst_crs, dst_affine, output_filename, dst_meta, method='cubic_spline', operation='mult', output_dtype='float32', **kwargs )
-
-
-
-	# make a new xray.Dataset with these outputs from the anomalies calculation for interpolatiobn
-	# anomalies_flip = xray.Dataset( {'cld_anom': (('time', 'lat', 'lon'), anomalies_interp)}, {'time':cld_ts31.time, 'lon':lons, 'lat':cld_ts31.lat } )
-
-	# maybe we should just interpolate it to the final extent we want from here?
-	# then just loop through the series of the sunp 10' climatologies? or just interp right to the 1km?
-
-
-
-
-# # # # # # # # # # #  TESTING SOME NEW CODE 	# # # # # # # # # # #
-# pad the bounds of the akcan template dataset
-# crs = { 'init':'epsg:3338' } # this needs to be gotten from the file itself
-# extent_path = os.path.join( base_path, 'extents_TEST' )
-# if not os.path.exists( extent_path ):
-# 	os.makedirs( extent_path )
-# new_ext_fn = os.path.join( extent_path, 'akcan_extent_TEST.shp' )
-npixels = ( -200, -2000, 200, 200 )
-expanded_bounds = padded_bounds( template_raster, npixels, template_raster.crs )
-
-# we should use the above padded bounds to filter the points 
-
-
-
-
-
-def expand_templateds_extent( template_raster_fn, expansion_tuple=(0,0,0,0) ):
-	'''
-	args:
-		template_raster_fn = [ str ] path to the template raster to match to
-		expansion_tuple = [ int ] 4 element tuple of (left, bottom, right, top) indicating how many pixels
-			to expand in each direction of the input template raster.
-
-	'''
-# template dataset
-template_raster = rasterio.open( template_raster_fn )
-resolution = template_raster.res
-template_meta = template_raster.meta
-
-# pad the bounds of the akcan template dataset
-# crs = { 'init':'epsg:3338' } # this needs to be gotten from the file itself
-extent_path = os.path.join( cru_path, 'extents' )
-if not os.path.exists( extent_path ):
-	os.makedirs( extent_path )
-new_ext_fn = os.path.join( extent_path, 'akcan_extent.shp' )
-npixels = ( -200, -2000, 200, 200 )
-pad_bounds( template_raster, npixels, template_raster.crs, new_ext_fn )
-
-# filename for a newly clipped and reprojected shapefile using the above padded bounds shape
-intermediate_path = os.path.join( cru_path, 'intermediate' )
-if not os.path.exists( intermediate_path ):
-	os.makedirs( intermediate_path )
-
-expanded_ext_fn = os.path.join( intermediate_path, variable + '_cru_ts20_1961_1990_climatology_3338_akcan_expanded.shp' )
-
-# reproject / crop to the AKCAN extent, the cru shapefile built above using ogr2ogr
-os.system( "ogr2ogr -overwrite -f 'ESRI Shapefile' -clipdst " + new_ext_fn +  " -s_srs 'EPSG:4326' -t_srs 'EPSG:3338' " + \
-			expanded_ext_fn + " " + cru_shp_fn )
-# -wrapdateline -- removed since it is not a geog srs output
-
-# generate metadata for the expanded extent to interpolate to
-xmin, ymin, xmax, ymax = fiona.open( new_ext_fn ).bounds
-cols = (xmax - xmin) / resolution[1]
-rows = (ymax - ymin) / resolution[0]
-
-# copy/update metadata to expanded extent
-expanded_meta = template_meta
-expanded_meta[ 'affine' ] = A( resolution[0], 0.0, xmin, 0.0, -resolution[1], ymax )
-expanded_meta[ 'crs' ] = { 'init':'epsg:3338' }
-expanded_meta[ 'height' ] = rows
-expanded_meta[ 'width' ] = cols
-expanded_meta[ 'transform' ] = expanded_meta[ 'affine' ].to_gdal()
-
-
-
-
-
+	# interpolate / reproject / resample 
+	pool = mp.Pool( processes=ncores )
+	out = pool.map( lambda args: run( **args ), args_list )
+	pool.close()
