@@ -238,7 +238,8 @@ if __name__ == '__main__':
 	
 	# convert into GeoDataFrame and drop all the NaNs
 	df_list = [ pd.DataFrame({ 'anom':i.ravel(), 'lat':la, 'lon':lo }).dropna( axis=0, how='any' ) for i in dat_pcll ]
-	meshgrid_tuple = np.meshgrid( lons_pcll, anomalies.lat.data )
+	xi, yi = np.meshgrid( lons_pcll, anomalies.lat.data )
+	# meshgrid_tuple = np.meshgrid( lons_pcll, anomalies.lat.data )
 
 	# argument setup
 	src_transform = affine.Affine( 0.5, 0.0, -180.0, 0.0, -0.5, 90.0 )
@@ -252,7 +253,7 @@ if __name__ == '__main__':
 	output_filenames = [ os.path.join( output_path, '_'.join([ 'cld_pct_cru_ts31',month,year])+'.tif' ) for month, year in month_year ]
 
 	# build a list of keyword args to pass to the pool of workers.
-	args_list = [ {'df':df, 'meshgrid_tuple':meshgrid_tuple, 'lons_pcll':lons_pcll, \
+	args_list = [ {'df':df, 'meshgrid_tuple':(xi, yi), 'lons_pcll':lons_pcll, \
 					'template_raster_fn':template_raster_fn, 'src_transform':src_transform, \
 					'src_crs':src_crs, 'src_nodata':src_nodata, 'output_filename':fn } for df, fn in zip( df_list, output_filenames ) ]
 
@@ -260,3 +261,9 @@ if __name__ == '__main__':
 	pool = mp.Pool( processes=ncores )
 	out = pool.map( lambda args: run( **args ), args_list )
 	pool.close()
+
+	# To Complete the CRU TS3.1 Downscaling we need the following: 
+	# [1] DOWNSCALE WITH THE CRU CL2.0 Calculated Cloud Climatology from Sunshine Percent
+	# [2] Mask the data 
+	# [3] give proper naming convention
+	# [4] output to GTiff
