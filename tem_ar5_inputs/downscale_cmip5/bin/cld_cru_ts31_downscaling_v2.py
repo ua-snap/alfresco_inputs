@@ -1,4 +1,59 @@
+# # #
+# Current implementation of the cru ts31 (ts32) delta downscaling procedure
+#
+# Author: Michael Lindgren (malindgren@alaska.edu)
+# # #
 import numpy as np
+def write_gtiff( output_arr, template_meta, output_filename, compress=True ):
+	'''
+	DESCRIPTION:
+	------------
+	output a GeoTiff given a numpy ndarray, rasterio-style 
+	metadata dictionary, and and output_filename.
+
+	If a multiband file is to be processed, the Longitude
+	dimension is expected to be the right-most. 
+	--> dimensions should be (band, latitude, longitude)
+
+	ARGUMENTS:
+	----------
+	output_arr = [numpy.ndarray] with longitude as the right-most dimension
+	template_meta = [dict] rasterio-style raster meta dictionary.  Typically 
+		found in a template raster by: rasterio.open( fn ).meta
+	output_filename = [str] path to and name of the output GeoTiff to be 
+		created.  currently only 'GTiff' is supported.
+	compress = [bool] if True (default) LZW-compression is applied to the 
+		output GeoTiff.  If False, no compression is applied.
+		* this can also be added (along with many other gdal creation options)
+		to the template meta as a key value pair template_meta.update( compress='lzw' ).
+		See Rasterio documentation for more details. This is just a common one that is 
+		supported here.
+
+	RETURNS:
+	--------
+	string path to the new output_filename created
+
+	'''
+	import os
+	if 'transform' in template_meta.keys():
+		_ = template_meta.pop( 'transform' )
+	if not output_filename.endswith( '.tif' ):
+		UserWarning( 'output_filename does not end with ".tif", it has been fixed for you.' )
+		output_filename = os.path.splitext( output_filename )[0] + '.tif'
+	if output_arr.ndim > 2:
+		nbands = output_arr.shape[0]
+	elif output_arr.ndim == 2:
+		nbands = 1
+	else:
+		raise ValueError( 'output_arr must have at least 2 dimensions' )
+	if template_meta[ 'count' ] != nbands:
+		raise ValueError( 'template_meta[ "count" ] must match output_arr bands' )
+	if compress == True and 'compress' not in template_meta.keys():
+		template_meta.update( compress=lzw )
+	with rasterio.open( output_filename, 'w', **template_meta ) as out:
+		for band in range( 1, nbands+1 ):
+			out.write( output_arr[ band, ... ], band )
+	return output_filename
 def shiftgrid(lon0,datain,lonsin,start=True,cyclic=360.0):
 	import numpy as np
 	"""
@@ -99,6 +154,37 @@ def xyz_to_grid( x, y, z, grid, method='cubic', output_dtype=np.float32 ):
 	zi = griddata( (x, y), z, grid, method=method )
 	zi = np.flipud( zi.astype( output_dtype ) )
 	return zi
+def run( df, meshgrid_tuple, lons_pcll, template_raster_fn, src_transform, src_crs, src_nodata, output_filename ):
+	'''
+	run the interpolation to a grid, and reprojection / resampling to the Alaska / Canada rasters
+	extent, resolution, origin (template_raster).
+
+	This function is intended to be used to run a pathos.multiprocessing Pool's map function
+	across a list of pre-computed arguments.
+			
+	RETURNS:
+
+	[str] path to the output filename generated
+
+	'''
+	template_raster = rasterio.open( template_raster_fn )
+	interp_arr = xyz_to_grid( np.array(df['lon'].tolist()), \
+					np.array(df['lat'].tolist()), \
+					np.array(df['anom'].tolist()), grid=meshgrid_tuple, method='cubic' ) 
+
+	src_nodata = -9999.0 # nodata
+	interp_arr[ np.isnan( interp_arr ) ] = src_nodata
+	dat, lons = shiftgrid( 180., interp_arr, lons_pcll, start=False )
+	output_arr = np.empty_like( template_raster.read( 1 ) )
+	template_meta = template_raster.meta
+
+	if 'transform' in template_meta.keys():
+		template_meta.pop( 'transform' )
+
+	reproject( dat, output_arr, src_transform=src_transform, src_crs=src_crs, src_nodata=src_nodata, \
+				dst_transform=template_meta['affine'], dst_crs=template_meta['crs'],\
+				dst_nodata=None, resampling=RESAMPLING.nearest, num_threads=1, SOURCE_EXTRA=1000 )	
+	return write_gtiff( output_arr, template_meta, output_filename, compress=True )
 
 if __name__ == '__main__':
 	import rasterio, xray, os, glob, affine
@@ -119,6 +205,8 @@ if __name__ == '__main__':
 	cld_ts20 = '' # read in the already pre-produced files.  They should be in 10'...  or maybe I need to change that.
 	climatology_begin = '1961'
 	climatology_end = '1990'
+	year_begin = 1901
+	year_end = 2009
 
 	# open with xray
 	cld_ts31 = xray.open_dataset( cld_ts31 )
@@ -150,42 +238,27 @@ if __name__ == '__main__':
 	xi, yi = np.meshgrid( lons_pcll, anomalies.lat.data )
 	meshgrid_tuple = np.meshgrid( lons_pcll, anomalies.lat.data )
 
-	cru_affine = affine.Affine( 0.5, 0.0, -180.0, 0.0, -0.5, 90.0 )
-	# cru_affine = affine.Affine( 0.5, 0.0, 0, 0.0, -0.5, 90.0 )
-	cru_meta = { 'affine':cru_affine, 'count':1, 'crs':{'init':'epsg:4326'}, 'driver':'GTiff', 'dtype':np.float32, 'height':360, 'nodata':-9999, 'width':720 }
-	# del out, df_list
+	# run the above function
+	# argument setup
+	meshgrid_tuple = (xi,yi)
+	src_transform = affine.Affine( 0.5, 0.0, -180.0, 0.0, -0.5, 90.0 )
+	src_crs = {'init':'epsg:4326'}
+	src_nodata = -9999.0
+	output_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/OCTOBER'
 	
-	# make a new xray.Dataset with these outputs from the anomalies calculation for interpolatiobn
-	# anomalies_flip = xray.Dataset( {'cld_anom': (('time', 'lat', 'lon'), anomalies_interp)}, {'time':cld_ts31.time, 'lon':lons, 'lat':cld_ts31.lat } )
+	# output_filenames setup
+	years = np.arange( year_begin, year_end+1, 1 ).astype( str ).tolist()
+	months = [ i if len(i)==2 else '0'+i for i in np.arange( 1, 12+1, 1 ).astype( str ).tolist() ]
+	month_year = [ (month, year) for year in years for month in months ]
+	output_filenames = [ os.path.join( output_path, '_'.join([ 'cld_pct_cru_ts31',month,year])+'.tif' ) for month, year in month_year ]
 
-	# make an output directory to store the interpolated/downscaled outputs.
+	args_list = [ {'df':df, 'meshgrid_tuple':meshgrid_tuple, 'lons_pcll':lons_pcll, \
+					'template_raster_fn':template_raster_fn, 'src_transform':src_transform, \
+					'src_crs':src_crs, 'src_nodata':src_nodata, 'output_filename':fn } for df, fn in zip( df_list, output_filenames ) ]
 
-
-
-	# map( lambda df: xyz_to_grid( df.lat, df.lon, df.anom, grid=meshgrid_tuple, method='cubic' ), df_list[:1] )
-	out = map( lambda df: xyz_to_grid( np.array(df['lon'].tolist()), np.array(df['lat'].tolist()), np.array(df['anom'].tolist()), grid=(xi,yi), method='cubic' ) , df_list[:2] )
-	# now we need to multiply new to the climatology from CL 2.0 sunp
-	# we could also put the interpolation @ 0.5deg and the reproject to AKCAN into a function
-	def run( df, meshgrid_tuple, lons_pcll, output_path ):
-		# interp_arr = xyz_to_grid( df.lat, df.lon, df.anom, grid=meshgrid_tuple, method='cubic' )
-		interp_arr = xyz_to_grid( np.array(df['lon'].tolist()), np.array(df['lat'].tolist()), np.array(df['anom'].tolist()), grid=meshgrid_tuple, method='cubic' )
-		src_nodata = -9999.0
-		interp_arr[ np.isnan(interp_arr) ] = src_nodata
-		dat, lons = shiftgrid( 180., interp_arr, lons_pcll, start=False ) # lons is from above flipping to 0-360
-		output_arr = np.empty_like(template_raster.read(1))
-		reproject( dat, output_arr, src_transform=cru_affine, src_crs={'init':'epsg:4326'},\
-								src_nodata=src_nodata, dst_transform=template_meta['affine'], dst_crs=template_meta['crs'],\
-								dst_nodata=None, resampling=RESAMPLING.nearest, num_threads=2, SOURCE_EXTRA=1000 )
-
-		# write out the new rasterio GTiff here:
-		output_filename = os.path.join( output_path, 'test_out.tif' )
-		with rasterio.open( output_filename, 'w', **template_meta ) as out:
-			out.write( output_arr, 1 )
-		return output_arr
-
-	pool = mp.ThreadPool( ncores )
-	new = pool.map( lambda df: run( df ), df_list )
+	# interpolate / reproject / resample 
+	pool = mp.Pool( processes=ncores )
+	out = pool.map( lambda args: run( **args ), args_list )
 	pool.close()
 
-# see this to figure out how to pass other vars to the lambda function we are currently using above that is complaining
-# http://stackoverflow.com/questions/5442910/python-multiprocessing-pool-map-for-multiple-arguments
+
