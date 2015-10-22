@@ -40,19 +40,19 @@ def write_gtiff( output_arr, template_meta, output_filename, compress=True ):
 	if not output_filename.endswith( '.tif' ):
 		UserWarning( 'output_filename does not end with ".tif", it has been fixed for you.' )
 		output_filename = os.path.splitext( output_filename )[0] + '.tif'
-	if output_arr.ndim > 2:
-		nbands = output_arr.shape[0]
-	elif output_arr.ndim == 2:
-		nbands = 1
-	else:
+	if output_arr.ndim == 2:
+		# add in a new dimension - can get you into trouble with very large rasters...
+		output_arr = output_arr[ np.newaxis, ... ] 
+	elif output_arr.ndim < 2:
 		raise ValueError( 'output_arr must have at least 2 dimensions' )
+	nbands, nrows, ncols = output_arr.shape 
 	if template_meta[ 'count' ] != nbands:
 		raise ValueError( 'template_meta[ "count" ] must match output_arr bands' )
 	if compress == True and 'compress' not in template_meta.keys():
-		template_meta.update( compress=lzw )
+		template_meta.update( compress='lzw' )
 	with rasterio.open( output_filename, 'w', **template_meta ) as out:
 		for band in range( 1, nbands+1 ):
-			out.write( output_arr[ band, ... ], band )
+			out.write( output_arr[ band-1, ... ], band )
 	return output_filename
 def shiftgrid(lon0,datain,lonsin,start=True,cyclic=360.0):
 	import numpy as np
@@ -197,10 +197,13 @@ if __name__ == '__main__':
 	from pathos import multiprocessing as mp
 
 	ncores = 15
+	
 	# filenames
 	base_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data'
 	cld_ts31 = '/Data/Base_Data/Climate/World/CRU_grids/CRU_TS31/cru_ts_3_10.1901.2009.cld.dat.nc'
 	template_raster_fn = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/templates/tas_mean_C_AR5_GFDL-CM3_historical_01_1860.tif'
+	output_path = os.path.join( base_path, 'OCTOBER' )
+
 	# this is the set of modified GTiffs produced in the conversion procedure with the ts2.0 data
 	cld_ts20 = '' # read in the already pre-produced files.  They should be in 10'...  or maybe I need to change that.
 	climatology_begin = '1961'
@@ -235,23 +238,20 @@ if __name__ == '__main__':
 	
 	# convert into GeoDataFrame and drop all the NaNs
 	df_list = [ pd.DataFrame({ 'anom':i.ravel(), 'lat':la, 'lon':lo }).dropna( axis=0, how='any' ) for i in dat_pcll ]
-	xi, yi = np.meshgrid( lons_pcll, anomalies.lat.data )
 	meshgrid_tuple = np.meshgrid( lons_pcll, anomalies.lat.data )
 
-	# run the above function
 	# argument setup
-	meshgrid_tuple = (xi,yi)
 	src_transform = affine.Affine( 0.5, 0.0, -180.0, 0.0, -0.5, 90.0 )
 	src_crs = {'init':'epsg:4326'}
 	src_nodata = -9999.0
-	output_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/OCTOBER'
-	
+		
 	# output_filenames setup
 	years = np.arange( year_begin, year_end+1, 1 ).astype( str ).tolist()
 	months = [ i if len(i)==2 else '0'+i for i in np.arange( 1, 12+1, 1 ).astype( str ).tolist() ]
 	month_year = [ (month, year) for year in years for month in months ]
 	output_filenames = [ os.path.join( output_path, '_'.join([ 'cld_pct_cru_ts31',month,year])+'.tif' ) for month, year in month_year ]
 
+	# build a list of keyword args to pass to the pool of workers.
 	args_list = [ {'df':df, 'meshgrid_tuple':meshgrid_tuple, 'lons_pcll':lons_pcll, \
 					'template_raster_fn':template_raster_fn, 'src_transform':src_transform, \
 					'src_crs':src_crs, 'src_nodata':src_nodata, 'output_filename':fn } for df, fn in zip( df_list, output_filenames ) ]
