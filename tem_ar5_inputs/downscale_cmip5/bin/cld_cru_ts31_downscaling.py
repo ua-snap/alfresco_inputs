@@ -192,7 +192,7 @@ def fn_month_grouper( x ):
 	take a filename and return the month element of the naming convention
 	'''
 	return os.path.splitext(os.path.basename(x))[0].split( '_' )[5]
-def downscale_cru_historical( file_list, cru_cl20_arr, output_path, operation='mult' ):
+def downscale_cru_historical( file_list, cru_cl20_arr, output_path, downscaling_operation ):
 	'''
 	take a list of cru_historical anomalies filenames, groupby month, 
 	then downscale with the cru_cl20 climatology as a numpy 2d ndarray
@@ -250,22 +250,7 @@ if __name__ == '__main__':
 	from collections import OrderedDict
 	from shapely.geometry import Point
 	from pathos import multiprocessing as mp
-
-	ncores = 10
-	
-	# input args -- argparse it
-	base_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_ts31'
-	cru_ts31 = '/Data/Base_Data/Climate/World/CRU_grids/CRU_TS31/cru_ts_3_10.1901.2009.cld.dat.nc'
-	cl20_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_v2/cru_ts20/cld/akcan'
-	template_raster_fn = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/templates/tas_mean_C_AR5_GFDL-CM3_historical_01_1860.tif'
-	output_path = os.path.join( base_path, 'OCTOBER' )
-
-	climatology_begin = '1961'
-	climatology_end = '1990'
-	year_begin = 1901
-	year_end = 2009
-	variable = 'cld' # variable id 
-	metric = 'pct'
+	import argparse
 
 	# unpack commandline args
 
@@ -295,7 +280,12 @@ if __name__ == '__main__':
 	# calculate the anomalies
 	clim_ds = cru_ts31.loc[ {'time':slice(climatology_begin,climatology_end)} ]
 	climatology = clim_ds[ variable ].groupby( 'time.month' ).mean( 'time' )
-	anomalies = cru_ts31[ variable ].groupby( 'time.month' ) / climatology
+
+	if anomalies_operation == 'relative':
+		anomalies = cru_ts31[ variable ].groupby( 'time.month' ) / climatology
+
+	if anomalies_operation == 'absolute':
+		anomalies = cru_ts31[ variable ].groupby( 'time.month' ) - climatology
 
 	# rotate the anomalies to pacific centered latlong -- this is already in the greenwich latlong
 	dat_pcll, lons_pcll = shiftgrid( 0., anomalies, anomalies.lon.data )
@@ -347,11 +337,30 @@ if __name__ == '__main__':
 
 	# unpack groups for parallelization and make a list of tuples of arguments to pass to the downscale function
 	mg = [(i,j) for i,j in months_grouped ]
-	args_list = [ ( i[1], cl20_dict[i[0]], downscaled_path ) for i in mg ]
+	args_list = [ ( i[1], cl20_dict[i[0]], downscaled_path, downscaling_operation ) for i in mg ]
 
 	# downscale / write to disk
 	pool = mp.Pool( processes=ncores )
 	out = pool.map( lambda args: downscale_cru_historical( *args ), args_list )
 	pool.close()
+
+
+
+# # # # # HOW TO RUN THE APPLICATION # # # # # # # 
+# # input args -- argparse it
+# ncores = 10
+# base_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_ts31'
+# cru_ts31 = '/Data/Base_Data/Climate/World/CRU_grids/CRU_TS31/cru_ts_3_10.1901.2009.cld.dat.nc'
+# cl20_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_v2/cru_ts20/cld/akcan'
+# template_raster_fn = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/templates/tas_mean_C_AR5_GFDL-CM3_historical_01_1860.tif'
+# anomalies_operation = 'relative' # 'absolute'
+# downscaling_operation = 'mult' # 'add', 'div'
+
+# climatology_begin = '1961'
+# climatology_end = '1990'
+# year_begin = 1901
+# year_end = 2009
+# variable = 'cld' # variable id 
+# metric = 'pct'
 
 
