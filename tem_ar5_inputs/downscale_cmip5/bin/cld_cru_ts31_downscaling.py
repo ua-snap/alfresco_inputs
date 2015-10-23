@@ -253,33 +253,35 @@ if __name__ == '__main__':
 
 	ncores = 10
 	
-	# filenames
+	# input args -- argparse it
 	base_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_ts31'
-	cld_ts31 = '/Data/Base_Data/Climate/World/CRU_grids/CRU_TS31/cru_ts_3_10.1901.2009.cld.dat.nc'
+	cru_ts31 = '/Data/Base_Data/Climate/World/CRU_grids/CRU_TS31/cru_ts_3_10.1901.2009.cld.dat.nc'
 	cl20_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_v2/cru_ts20/cld/akcan'
 	template_raster_fn = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/templates/tas_mean_C_AR5_GFDL-CM3_historical_01_1860.tif'
 	output_path = os.path.join( base_path, 'OCTOBER' )
 
-	# make some output directories if they are not there already to dump 
-	# our output files
-	anomalies_path = os.path.join( base_path, 'anom' )
-	if not os.path.exists( anomalies_path ):
-		os.makedirs( anomalies_path )
-
-	downscaled_path = os.path.join( base_path, 'downscaled' )
-	if not os.path.exists( downscaled_path ):
-		os.makedirs( downscaled_path )
-
-
-	# this is the set of modified GTiffs produced in the conversion procedure with the ts2.0 data
-	cld_ts20 = '' # read in the already pre-produced files.  They should be in 10'...  or maybe I need to change that.
 	climatology_begin = '1961'
 	climatology_end = '1990'
 	year_begin = 1901
 	year_end = 2009
+	variable = 'cld' # variable id 
+	metric = 'pct'
+
+	# unpack commandline args
+
+
+	# make some output directories if they are not there already to dump 
+	# our output files
+	anomalies_path = os.path.join( base_path, variable, 'anom' )
+	if not os.path.exists( anomalies_path ):
+		os.makedirs( anomalies_path )
+
+	downscaled_path = os.path.join( base_path, variable, 'downscaled' )
+	if not os.path.exists( downscaled_path ):
+		os.makedirs( downscaled_path )
 
 	# open with xray
-	cld_ts31 = xray.open_dataset( cld_ts31 )
+	cru_ts31 = xray.open_dataset( cru_ts31 )
 	
 	# open template raster
 	template_raster = rasterio.open( template_raster_fn )
@@ -291,9 +293,9 @@ if __name__ == '__main__':
 	template_raster_mask[ template_raster_mask == 255 ] = 1
 
 	# calculate the anomalies
-	clim_ds = cld_ts31.loc[ {'time':slice(climatology_begin,climatology_end)} ]
-	climatology = clim_ds.cld.groupby( 'time.month' ).mean( 'time' )
-	anomalies = cld_ts31.cld.groupby( 'time.month' ) / climatology
+	clim_ds = cru_ts31.loc[ {'time':slice(climatology_begin,climatology_end)} ]
+	climatology = clim_ds[ variable ].groupby( 'time.month' ).mean( 'time' )
+	anomalies = cru_ts31[ variable ].groupby( 'time.month' ) / climatology
 
 	# rotate the anomalies to pacific centered latlong -- this is already in the greenwich latlong
 	dat_pcll, lons_pcll = shiftgrid( 0., anomalies, anomalies.lon.data )
@@ -321,7 +323,7 @@ if __name__ == '__main__':
 	years = np.arange( year_begin, year_end+1, 1 ).astype( str ).tolist()
 	months = [ i if len(i)==2 else '0'+i for i in np.arange( 1, 12+1, 1 ).astype( str ).tolist() ]
 	month_year = [ (month, year) for year in years for month in months ]
-	output_filenames = [ os.path.join( anomalies_path, '_'.join([ 'cld_pct_cru_ts31_anom',month,year])+'.tif' ) for month, year in month_year ]
+	output_filenames = [ os.path.join( anomalies_path, '_'.join([ variable,metric,'cru_ts31_anom',month,year])+'.tif' ) for month, year in month_year ]
 
 	# build a list of keyword args to pass to the pool of workers.
 	args_list = [ {'df':df, 'meshgrid_tuple':(xi, yi), 'lons_pcll':lons_pcll, \
@@ -335,7 +337,7 @@ if __name__ == '__main__':
 
 	# To Complete the CRU TS3.1 Downscaling we need the following: 
 	# read in the pre-processed CL2.0 Cloud Climatology
-	l = sorted( glob.glob( os.path.join( cl20_path, 'cld_*.tif' ) ) )
+	l = sorted( glob.glob( os.path.join( cl20_path, '*.tif' ) ) ) # this could catch you.
 	cl20_dict = { month:rasterio.open( fn ).read( 1 ) for month, fn in zip( months, l ) }
 
 	# group the data by months
