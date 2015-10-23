@@ -219,6 +219,10 @@ if __name__ == '__main__':
 	template_meta = template_raster.meta
 	template_meta.update( crs={'init':'epsg:3338'} )
 
+	# make a mask with values of 0=nodata and 1=data
+	template_raster_mask = template_raster.read_mask( 1 )
+	template_raster_mask[ template_raster_mask == 255 ] = 1
+
 	# calculate the anomalies
 	clim_ds = cld_ts31.loc[ {'time':slice(climatology_begin,climatology_end)} ]
 	climatology = clim_ds.cld.groupby( 'time.month' ).mean( 'time' )
@@ -250,20 +254,59 @@ if __name__ == '__main__':
 	years = np.arange( year_begin, year_end+1, 1 ).astype( str ).tolist()
 	months = [ i if len(i)==2 else '0'+i for i in np.arange( 1, 12+1, 1 ).astype( str ).tolist() ]
 	month_year = [ (month, year) for year in years for month in months ]
-	output_filenames = [ os.path.join( output_path, '_'.join([ 'cld_pct_cru_ts31',month,year])+'.tif' ) for month, year in month_year ]
+	output_filenames = [ os.path.join( output_path, '_'.join([ 'cld_pct_cru_ts31_anom',month,year])+'.tif' ) for month, year in month_year ]
 
 	# build a list of keyword args to pass to the pool of workers.
 	args_list = [ {'df':df, 'meshgrid_tuple':(xi, yi), 'lons_pcll':lons_pcll, \
 					'template_raster_fn':template_raster_fn, 'src_transform':src_transform, \
 					'src_crs':src_crs, 'src_nodata':src_nodata, 'output_filename':fn } for df, fn in zip( df_list, output_filenames ) ]
 
-	# interpolate / reproject / resample 
+	# interpolate / reproject / resample
 	pool = mp.Pool( processes=ncores )
 	out = pool.map( lambda args: run( **args ), args_list )
 	pool.close()
 
 	# To Complete the CRU TS3.1 Downscaling we need the following: 
 	# [1] DOWNSCALE WITH THE CRU CL2.0 Calculated Cloud Climatology from Sunshine Percent
+	# read in the pre-processed CL2.0 Cloud Climatology
+	cl20_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_v2/cru_ts20/cld/akcan'
+	l = sorted( glob.glob( os.path.join( cl20_path, 'cld_*.tif' ) ) )
+	cl20_dict = { month:rasterio.open( fn ).read( 1 ) for month, fn in zip( months, l ) }
+
+	# group the data by months	
+	def fn_month_grouper( x ):
+		'''
+		take a filename and return the month element of the naming convention
+		'''
+		return os.path.splitext(os.path.basename(x))[0].split( '_' )[4]
+	
+	out = pd.Series( out )
+	out_months = out.apply( fn_month_grouper )
+	months_grouped = out.groupby( out_months )
+
+	def f( file_list, cru_cl20_arr ):
+		def downscale( fn, arr2 ):
+			cru_ts31 = rasterio.open( fn )
+			meta = cru_ts31.meta
+			meta.update( compress='lzw' )
+			cru_ts31 = cru_ts31.read( 1 )
+			return cru_cl20_arr * cru_ts31
+			
+		partial_downscale = partial( downscale, arr2=cru_cl20_arr )
+		cru_ts31 = file_list.apply( lambda fn: partial_downscale( fn=fn ) )
+		
+
+		output_filenames = [ fn.replace( 'anom', 'downscaled' ) for fn in file_list ]
+
+
+	months_grouped.apply(  )
+
+
+	test = [i for i in months_grouped ]
+
+
+
+
 	# [2] Mask the data 
 	# [3] give proper naming convention
 	# [4] output to GTiff

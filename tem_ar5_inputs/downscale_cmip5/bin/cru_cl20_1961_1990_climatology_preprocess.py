@@ -133,7 +133,7 @@ def crop_to_bounds( rasterio_rst, bounds ):
 	''' crop a raster by a window made from bounds of another domain '''
 	window = rasterio_rst.window( *bounds )
 	return rasterio_rst.read( 1, window=window )
-def interpolate_akcan( x, y, z, grid, expanded_meta, template_rst, output_filename, mask=None, mask_value=None, method='cubic', output_dtype=np.float32 ):
+def interpolate_akcan( x, y, z, grid, expanded_meta, template_rst, output_filename, method='cubic', output_dtype=np.float32 ):
 	'''
 	interpolate across the alaska canada domains and crop / mask to that extent
 	'''
@@ -152,6 +152,8 @@ def interpolate_akcan( x, y, z, grid, expanded_meta, template_rst, output_filena
 	with rasterio.open( output_filename, 'w', **meta ) as out:
 		mask = template_rst.read_masks( 1 )
 		akcan[ mask == 0 ] = meta[ 'nodata' ]
+		akcan = np.ma.masked_where( mask == 0, akcan )
+		akcan.fill_value = meta[ 'nodata' ]
 		out.write_band( 1, akcan )
 	return output_filename
 def run( args ):
@@ -267,9 +269,11 @@ if __name__ == '__main__':
 	# run it in parallel -- the pool is not working currently!  switching to serial
 	args_list = [ { 'x':x, 'y':y, 'z':np.array(cru_gdf[ month ]), 'grid':(xi,yi), 'expanded_meta':expanded_meta, 'template_rst':template_raster, 'output_filename':out_fn } for month, out_fn in zip( months, output_filenames ) ]
 	# pool = mp.Pool( 4 )
-	out = map( run, args_list )
-	# out = pool.map( run, args_list )
+	out = map( lambda x: run( x ), args_list )
+	# out = pool.map( lambda x: run( x ), args_list )
 	# pool.close()
+
+	
 
 
 # # # EXAMPLE OF USE # # #
@@ -277,7 +281,7 @@ if __name__ == '__main__':
 # os.chdir( '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/CODE/tem_ar5_inputs/downscale_cmip5/bin' )
 # cru_folder = '/Data/Base_Data/Climate/World/CRU_grids/CRU_TS20'
 # var_fn_dict = { 'hur':os.path.join( cru_folder, 'grid_10min_reh.dat.gz'),'tas':os.path.join( cru_folder, 'grid_10min_tmp.dat.gz'), 'sunp':os.path.join( cru_folder, 'grid_10min_sunp.dat.gz' ) }
-# base_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_v2'
+# base_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_october_final'
 # template_raster_fn = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/templates/tas_mean_C_AR5_GFDL-CM3_historical_01_1860.tif'
 
 # for variable, cru_filename in var_fn_dict.iteritems():

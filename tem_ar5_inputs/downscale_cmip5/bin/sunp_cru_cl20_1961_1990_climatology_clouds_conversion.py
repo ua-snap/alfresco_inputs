@@ -3,8 +3,8 @@ import rasterio, glob, os
 import numpy as np
 
 # list the files
-input_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_v2/cru_ts20/sunp/akcan'
-output_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_v2/cru_ts20/cld/akcan'
+input_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_october_final/cru_ts20/sunp/akcan'
+output_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_october_final/cru_ts20/cld/akcan'
 
 if not os.path.exists( output_path ):
 	os.makedirs( output_path )
