@@ -252,8 +252,23 @@ if __name__ == '__main__':
 	from pathos import multiprocessing as mp
 	import argparse
 
-	# unpack commandline args
+	# parse the commandline arguments
+	parser = argparse.ArgumentParser( description='preprocess cmip5 input netcdf files to a common type and single files' )
+	parser.add_argument( "-hi", "--cru_ts31", action='store', dest='cru_ts31', type=str, help="path to historical CRU TS3.1 input NetCDF file" )
+	parser.add_argument( "-ci", "--cl20_path", action='store', dest='cl20_path', type=str, help="path to historical CRU TS2.0 Climatology input directory in single-band GTiff Format" )
+	parser.add_argument( "-base", "--base_dir", action='store', dest='base_dir', type=str, help="string path to the folder to put the output files into" )
+	parser.add_argument( "-bt", "--year_begin", action='store', dest='year_begin', type=str, help="string in format YYYY of the beginning year in the series" )
+	parser.add_argument( "-et", "--year_end", action='store', dest='year_end', type=str, help="string in format YYYY of the ending year in the series" )
+	parser.add_argument( "-cbt", "--climatology_begin_time", nargs='?', const='196101', action='store', dest='climatology_begin', type=str, help="string in format YYYY of the beginning year of the climatology period" )
+	parser.add_argument( "-cet", "--climatology_end_time", nargs='?', const='199012', action='store', dest='climatology_end', type=str, help="string in format YYYY of the ending year of the climatology period" )
+	parser.add_argument( "-nc", "--ncores", nargs='?', const=2, action='store', dest='ncores', type=int, help="integer valueof number of cores to use. default:2" )
+	parser.add_argument( "-at", "--anomalies_calc_type", nargs='?', const='absolute', action='store', dest='anomalies_calc_type', type=str, help="string of 'proportional' or 'absolute' to inform of anomalies calculation type to perform." )
+	parser.add_argument( "-m", "--metric", nargs='?', const='metric', action='store', dest='metric', type=str, help="string of whatever the metric type is of the outputs to put in the filename." )
+	parser.add_argument( "-dso", "--downscaling_operation", action='store', dest='downscale_operation', type=str, help="string of 'add', 'mult', 'div', which refers to the type or downscaling operation to use." )
+	parser.add_argument( "-v", "--variable", action='store', dest='variable', type=str, help="string of the abbreviation used to identify the variable (i.e. cld)." )
 
+	# unpack commandline args
+	args = parser.parse_args()
 
 	# make some output directories if they are not there already to dump 
 	# our output files
@@ -281,10 +296,10 @@ if __name__ == '__main__':
 	clim_ds = cru_ts31.loc[ {'time':slice(climatology_begin,climatology_end)} ]
 	climatology = clim_ds[ variable ].groupby( 'time.month' ).mean( 'time' )
 
-	if anomalies_operation == 'relative':
+	if anomalies_calc_type == 'relative':
 		anomalies = cru_ts31[ variable ].groupby( 'time.month' ) / climatology
 
-	if anomalies_operation == 'absolute':
+	if anomalies_calc_type == 'absolute':
 		anomalies = cru_ts31[ variable ].groupby( 'time.month' ) - climatology
 
 	# rotate the anomalies to pacific centered latlong -- this is already in the greenwich latlong
@@ -349,18 +364,18 @@ if __name__ == '__main__':
 # # # # # HOW TO RUN THE APPLICATION # # # # # # # 
 # # input args -- argparse it
 # ncores = 10
-# base_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_ts31'
-# cru_ts31 = '/Data/Base_Data/Climate/World/CRU_grids/CRU_TS31/cru_ts_3_10.1901.2009.cld.dat.nc'
-# cl20_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_v2/cru_ts20/cld/akcan'
+# # base_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_ts31'
+# # cru_ts31 = '/Data/Base_Data/Climate/World/CRU_grids/CRU_TS31/cru_ts_3_10.1901.2009.cld.dat.nc'
+# # cl20_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_v2/cru_ts20/cld/akcan'
 # template_raster_fn = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/templates/tas_mean_C_AR5_GFDL-CM3_historical_01_1860.tif'
-# anomalies_operation = 'relative' # 'absolute'
-# downscaling_operation = 'mult' # 'add', 'div'
+# # aanomalies_calc_type = 'relative' # 'absolute'
+# # downscaling_operation = 'mult' # 'add', 'div'
 
 # climatology_begin = '1961'
 # climatology_end = '1990'
-# year_begin = 1901
-# year_end = 2009
+# # year_begin = 1901
+# # year_end = 2009
 # variable = 'cld' # variable id 
-# metric = 'pct'
+# # metric = 'pct'
 
 
