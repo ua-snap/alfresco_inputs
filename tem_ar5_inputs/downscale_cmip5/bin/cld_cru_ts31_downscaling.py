@@ -176,6 +176,8 @@ def run( df, meshgrid_tuple, lons_pcll, template_raster_fn, src_transform, src_c
 	interp_arr[ np.isnan( interp_arr ) ] = src_nodata
 	dat, lons = shiftgrid( 180., interp_arr, lons_pcll, start=False )
 	output_arr = np.empty_like( template_raster.read( 1 ) )
+	# mask it with the internal mask in the template raster, where 0 is oob.
+	output_arr = np.ma.masked_where( template_raster.read_masks( 1 ) == 0, output_arr )
 	template_meta = template_raster.meta
 
 	if 'transform' in template_meta.keys():
@@ -185,6 +187,59 @@ def run( df, meshgrid_tuple, lons_pcll, template_raster_fn, src_transform, src_c
 				dst_transform=template_meta['affine'], dst_crs=template_meta['crs'],\
 				dst_nodata=None, resampling=RESAMPLING.nearest, num_threads=1, SOURCE_EXTRA=1000 )	
 	return write_gtiff( output_arr, template_meta, output_filename, compress=True )
+def fn_month_grouper( x ):
+	'''
+	take a filename and return the month element of the naming convention
+	'''
+	return os.path.splitext(os.path.basename(x))[0].split( '_' )[5]
+def downscale_cru_historical( file_list, cru_cl20_arr, output_path, operation='mult' ):
+	'''
+	take a list of cru_historical anomalies filenames, groupby month, 
+	then downscale with the cru_cl20 climatology as a numpy 2d ndarray
+	that is also on the same grid as the anomalies files.  
+	(intended to be the akcan 1km/2km extent).
+
+	operation can be one of 'mult', 'add', 'div' and represents the 
+	downscaling operation to be use to scale the anomalies on top of the baseline.
+	this is based on how the anomalies were initially calculated.
+
+	RETURNS:
+
+	output path location of the new downscaled files.
+	'''
+	from functools import partial
+	
+	def f( anomaly_fn, baseline_arr, output_path ):
+		def add( cru, anom ):
+			return cru + anom
+		def mult( cru, anom ):
+			return cru * anom
+		def div( cru, anom ):
+			# return cru / anom
+			# this one may not be useful, but the placeholder is here 
+			return NotImplementedError
+
+		operation_switch = { 'add':add, 'mult':mult, 'div':div }
+		downscaled = operation_switch[ operation ]( cru, out )
+
+		cru_ts31 = rasterio.open( anomaly_fn )
+		meta = cru_ts31.meta
+		meta.update( compress='lzw' )
+		cru_ts31 = cru_ts31.read( 1 )
+		# this is hardwired stuff for this fairly hardwired script.
+		output_filename = os.path.basename( anomaly_fn ).replace( 'anom', 'downscaled' )
+		output_filename = os.path.join( output_path, output_filename )
+		output_arr = baseline_arr * cru_ts31 # multiply since it was relative anomalies
+		if 'transform' in meta.keys():
+			meta.pop( 'transform' )
+		with rasterio.open( output_filename, 'w', **meta ) as out:
+			out.write( output_arr, 1 )
+		return output_filename
+		
+	partial_f = partial( f, baseline_arr=cru_cl20_arr )
+	cru_ts31 = file_list.apply( lambda fn: partial_f( anomaly_fn=fn ) )
+	return output_path
+
 
 if __name__ == '__main__':
 	import rasterio, xray, os, glob, affine
@@ -196,13 +251,25 @@ if __name__ == '__main__':
 	from shapely.geometry import Point
 	from pathos import multiprocessing as mp
 
-	ncores = 15
+	ncores = 10
 	
 	# filenames
-	base_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data'
+	base_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_ts31'
 	cld_ts31 = '/Data/Base_Data/Climate/World/CRU_grids/CRU_TS31/cru_ts_3_10.1901.2009.cld.dat.nc'
+	cl20_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_v2/cru_ts20/cld/akcan'
 	template_raster_fn = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/templates/tas_mean_C_AR5_GFDL-CM3_historical_01_1860.tif'
 	output_path = os.path.join( base_path, 'OCTOBER' )
+
+	# make some output directories if they are not there already to dump 
+	# our output files
+	anomalies_path = os.path.join( base_path, 'anom' )
+	if not os.path.exists( anomalies_path ):
+		os.makedirs( anomalies_path )
+
+	downscaled_path = os.path.join( base_path, 'downscaled' )
+	if not os.path.exists( downscaled_path ):
+		os.makedirs( downscaled_path )
+
 
 	# this is the set of modified GTiffs produced in the conversion procedure with the ts2.0 data
 	cld_ts20 = '' # read in the already pre-produced files.  They should be in 10'...  or maybe I need to change that.
@@ -220,7 +287,7 @@ if __name__ == '__main__':
 	template_meta.update( crs={'init':'epsg:3338'} )
 
 	# make a mask with values of 0=nodata and 1=data
-	template_raster_mask = template_raster.read_mask( 1 )
+	template_raster_mask = template_raster.read_masks( 1 )
 	template_raster_mask[ template_raster_mask == 255 ] = 1
 
 	# calculate the anomalies
@@ -254,59 +321,35 @@ if __name__ == '__main__':
 	years = np.arange( year_begin, year_end+1, 1 ).astype( str ).tolist()
 	months = [ i if len(i)==2 else '0'+i for i in np.arange( 1, 12+1, 1 ).astype( str ).tolist() ]
 	month_year = [ (month, year) for year in years for month in months ]
-	output_filenames = [ os.path.join( output_path, '_'.join([ 'cld_pct_cru_ts31_anom',month,year])+'.tif' ) for month, year in month_year ]
+	output_filenames = [ os.path.join( anomalies_path, '_'.join([ 'cld_pct_cru_ts31_anom',month,year])+'.tif' ) for month, year in month_year ]
 
 	# build a list of keyword args to pass to the pool of workers.
 	args_list = [ {'df':df, 'meshgrid_tuple':(xi, yi), 'lons_pcll':lons_pcll, \
 					'template_raster_fn':template_raster_fn, 'src_transform':src_transform, \
 					'src_crs':src_crs, 'src_nodata':src_nodata, 'output_filename':fn } for df, fn in zip( df_list, output_filenames ) ]
 
-	# interpolate / reproject / resample
+	# interpolate / reproject / resample the anomalies to match template_raster
 	pool = mp.Pool( processes=ncores )
 	out = pool.map( lambda args: run( **args ), args_list )
 	pool.close()
 
 	# To Complete the CRU TS3.1 Downscaling we need the following: 
-	# [1] DOWNSCALE WITH THE CRU CL2.0 Calculated Cloud Climatology from Sunshine Percent
 	# read in the pre-processed CL2.0 Cloud Climatology
-	cl20_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_v2/cru_ts20/cld/akcan'
 	l = sorted( glob.glob( os.path.join( cl20_path, 'cld_*.tif' ) ) )
 	cl20_dict = { month:rasterio.open( fn ).read( 1 ) for month, fn in zip( months, l ) }
 
-	# group the data by months	
-	def fn_month_grouper( x ):
-		'''
-		take a filename and return the month element of the naming convention
-		'''
-		return os.path.splitext(os.path.basename(x))[0].split( '_' )[4]
-	
+	# group the data by months
 	out = pd.Series( out )
 	out_months = out.apply( fn_month_grouper )
 	months_grouped = out.groupby( out_months )
 
-	def f( file_list, cru_cl20_arr ):
-		def downscale( fn, arr2 ):
-			cru_ts31 = rasterio.open( fn )
-			meta = cru_ts31.meta
-			meta.update( compress='lzw' )
-			cru_ts31 = cru_ts31.read( 1 )
-			return cru_cl20_arr * cru_ts31
-			
-		partial_downscale = partial( downscale, arr2=cru_cl20_arr )
-		cru_ts31 = file_list.apply( lambda fn: partial_downscale( fn=fn ) )
-		
+	# unpack groups for parallelization and make a list of tuples of arguments to pass to the downscale function
+	mg = [(i,j) for i,j in months_grouped ]
+	args_list = [ ( i[1], cl20_dict[i[0]], downscaled_path ) for i in mg ]
 
-		output_filenames = [ fn.replace( 'anom', 'downscaled' ) for fn in file_list ]
+	# downscale / write to disk
+	pool = mp.Pool( processes=ncores )
+	out = pool.map( lambda args: downscale_cru_historical( *args ), args_list )
+	pool.close()
 
 
-	months_grouped.apply(  )
-
-
-	test = [i for i in months_grouped ]
-
-
-
-
-	# [2] Mask the data 
-	# [3] give proper naming convention
-	# [4] output to GTiff
