@@ -219,13 +219,13 @@ def downscale_cru_historical( file_list, cru_cl20_arr, output_path, downscaling_
 			# this one may not be useful, but the placeholder is here 
 			return NotImplementedError
 
-		operation_switch = { 'add':add, 'mult':mult, 'div':div }
-		downscaled = operation_switch[ operation ]( cru, out )
 
 		cru_ts31 = rasterio.open( anomaly_fn )
 		meta = cru_ts31.meta
 		meta.update( compress='lzw' )
 		cru_ts31 = cru_ts31.read( 1 )
+		operation_switch = { 'add':add, 'mult':mult, 'div':div }
+		downscaled = operation_switch[ downscaling_operation ]( baseline_arr, cru_ts31 )
 		# this is hardwired stuff for this fairly hardwired script.
 		output_filename = os.path.basename( anomaly_fn ).replace( 'anom', 'downscaled' )
 		output_filename = os.path.join( output_path, output_filename )
@@ -309,6 +309,10 @@ if __name__ == '__main__':
 	template_raster_mask[ template_raster_mask == 255 ] = 1
 
 	# calculate the anomalies
+	# this is temporary name change for the tmp (tas) data naming diff.
+	if variable == 'tas':
+		variable = 'tmp'
+
 	clim_ds = cru_ts31.loc[ {'time':slice(climatology_begin,climatology_end)} ]
 	climatology = clim_ds[ variable ].groupby( 'time.month' ).mean( 'time' )
 
@@ -317,6 +321,10 @@ if __name__ == '__main__':
 
 	if anomalies_calc_type == 'absolute':
 		anomalies = cru_ts31[ variable ].groupby( 'time.month' ) - climatology
+
+	# reset the variable if tas
+	if variable == 'tmp':
+		variable = 'tas'
 
 	# rotate the anomalies to pacific centered latlong -- this is already in the greenwich latlong
 	dat_pcll, lons_pcll = shiftgrid( 0., anomalies, anomalies.lon.data )
@@ -344,14 +352,16 @@ if __name__ == '__main__':
 	years = np.arange( year_begin, year_end+1, 1 ).astype( str ).tolist()
 	months = [ i if len(i)==2 else '0'+i for i in np.arange( 1, 12+1, 1 ).astype( str ).tolist() ]
 	month_year = [ (month, year) for year in years for month in months ]
-	output_filenames = [ os.path.join( anomalies_path, '_'.join([ variable,metric,'cru_ts31_anom',month,year])+'.tif' ) for month, year in month_year ]
+	output_filenames = [ os.path.join( anomalies_path, '_'.join([ variable,metric,'cru_ts31_anom',month,year])+'.tif' ) 
+							for month, year in month_year ]
 
 	# build a list of keyword args to pass to the pool of workers.
 	args_list = [ {'df':df, 'meshgrid_tuple':(xi, yi), 'lons_pcll':lons_pcll, \
 					'template_raster_fn':template_raster_fn, 'src_transform':src_transform, \
-					'src_crs':src_crs, 'src_nodata':src_nodata, 'output_filename':fn } for df, fn in zip( df_list, output_filenames ) ]
+					'src_crs':src_crs, 'src_nodata':src_nodata, 'output_filename':fn } \
+						for df, fn in zip( df_list, output_filenames ) ]
 
-	# interpolate / reproject / resample the anomalies to match template_raster
+	# interpolate / reproject / resample the anomalies to match template_raster_fn
 	pool = mp.Pool( processes=ncores )
 	out = pool.map( lambda args: run( **args ), args_list )
 	pool.close()
@@ -378,22 +388,22 @@ if __name__ == '__main__':
 
 # # # # # HOW TO RUN THE APPLICATION # # # # # # # 
 # # input args -- argparse it
+# import os
 # os.chdir( '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/CODE/tem_ar5_inputs/downscale_cmip5/bin' )
-
 # ncores = '10'
 # base_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_october_final/cru_ts31'
-# cru_ts31 = '/Data/Base_Data/Climate/World/CRU_grids/CRU_TS31/cru_ts_3_10.1901.2009.cld.dat.nc'
-# cl20_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_v2/cru_ts20/cld/akcan'
+# cru_ts31 = '/Data/Base_Data/Climate/World/CRU_grids/CRU_TS31/cru_ts_3_10.1901.2009.tmp.nc' # cru_ts_3_10.1901.2009.reh.dat.nc'
+# cl20_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_v2/cru_ts20/tas/akcan'
 # template_raster_fn = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/templates/tas_mean_C_AR5_GFDL-CM3_historical_01_1860.tif'
-# anomalies_calc_type = 'relative' # 'absolute'
-# downscaling_operation = 'mult' # 'add', 'div'
+# anomalies_calc_type = 'absolute' # 'relative'
+# downscaling_operation = 'add' # 'mult', 'div'
 
 # climatology_begin = '1961'
 # climatology_end = '1990'
 # year_begin = '1901'
 # year_end = '2009'
-# variable = 'cld'
-# metric = 'pct'
+# variable = 'tas'
+# metric = 'C'
 
 # args_tuples = [ ('hi', cru_ts31), ('ci', cl20_path), ('tr', template_raster_fn), 
 # 				('base', base_path), ('bt', year_begin), ('et', year_end), 
