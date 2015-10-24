@@ -236,7 +236,7 @@ def downscale_cru_historical( file_list, cru_cl20_arr, output_path, downscaling_
 			out.write( output_arr, 1 )
 		return output_filename
 		
-	partial_f = partial( f, baseline_arr=cru_cl20_arr )
+	partial_f = partial( f, baseline_arr=cru_cl20_arr, output_path=output_path )
 	cru_ts31 = file_list.apply( lambda fn: partial_f( anomaly_fn=fn ) )
 	return output_path
 
