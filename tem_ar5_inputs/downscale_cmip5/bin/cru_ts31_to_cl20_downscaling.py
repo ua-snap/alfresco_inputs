@@ -256,8 +256,8 @@ if __name__ == '__main__':
 	parser = argparse.ArgumentParser( description='preprocess cmip5 input netcdf files to a common type and single files' )
 	parser.add_argument( "-hi", "--cru_ts31", action='store', dest='cru_ts31', type=str, help="path to historical CRU TS3.1 input NetCDF file" )
 	parser.add_argument( "-ci", "--cl20_path", action='store', dest='cl20_path', type=str, help="path to historical CRU TS2.0 Climatology input directory in single-band GTiff Format" )
-	parser.add_argument( "-tr", "--template_raster", action='store', dest='template_raster', type=str, help="path to ALFRESCO Formatted template raster to match outputs to." )
-	parser.add_argument( "-base", "--base_dir", action='store', dest='base_dir', type=str, help="string path to the folder to put the output files into" )
+	parser.add_argument( "-tr", "--template_raster_fn", action='store', dest='template_raster_fn', type=str, help="path to ALFRESCO Formatted template raster to match outputs to." )
+	parser.add_argument( "-base", "--base_path", action='store', dest='base_path', type=str, help="string path to the folder to put the output files into" )
 	parser.add_argument( "-bt", "--year_begin", action='store', dest='year_begin', type=int, help="string in format YYYY of the beginning year in the series" )
 	parser.add_argument( "-et", "--year_end", action='store', dest='year_end', type=int, help="string in format YYYY of the ending year in the series" )
 	parser.add_argument( "-cbt", "--climatology_begin_time", nargs='?', const='196101', action='store', dest='climatology_begin', type=str, help="string in format YYYY of the beginning year of the climatology period" )
@@ -265,11 +265,26 @@ if __name__ == '__main__':
 	parser.add_argument( "-nc", "--ncores", nargs='?', const=2, action='store', dest='ncores', type=int, help="integer valueof number of cores to use. default:2" )
 	parser.add_argument( "-at", "--anomalies_calc_type", nargs='?', const='absolute', action='store', dest='anomalies_calc_type', type=str, help="string of 'proportional' or 'absolute' to inform of anomalies calculation type to perform." )
 	parser.add_argument( "-m", "--metric", nargs='?', const='metric', action='store', dest='metric', type=str, help="string of whatever the metric type is of the outputs to put in the filename." )
-	parser.add_argument( "-dso", "--downscaling_operation", action='store', dest='downscale_operation', type=str, help="string of 'add', 'mult', 'div', which refers to the type or downscaling operation to use." )
+	parser.add_argument( "-dso", "--downscaling_operation", action='store', dest='downscaling_operation', type=str, help="string of 'add', 'mult', 'div', which refers to the type or downscaling operation to use." )
 	parser.add_argument( "-v", "--variable", action='store', dest='variable', type=str, help="string of the abbreviation used to identify the variable (i.e. cld)." )
 
-	# unpack commandline args
+	# parse args
 	args = parser.parse_args()
+
+	# unpack args
+	ncores = args.ncores
+	base_path = args.base_path
+	cru_ts31 = args.cru_ts31
+	cl20_path = args.cl20_path
+	template_raster_fn = args.template_raster_fn
+	anomalies_calc_type = args.anomalies_calc_type
+	downscaling_operation = args.downscaling_operation
+	climatology_begin = args.climatology_begin
+	climatology_end = args.climatology_end
+	year_begin = args.year_begin
+	year_end = args.year_end
+	variable = args.variable
+	metric = args.metric
 
 	# make some output directories if they are not there already to dump 
 	# our output files
@@ -361,32 +376,31 @@ if __name__ == '__main__':
 	pool.close()
 
 
-
 # # # # # HOW TO RUN THE APPLICATION # # # # # # # 
 # # input args -- argparse it
-os.chdir( '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/CODE/tem_ar5_inputs/downscale_cmip5/bin' )
+# os.chdir( '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/CODE/tem_ar5_inputs/downscale_cmip5/bin' )
 
-ncores = '10'
-base_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_october_final/cru_ts31'
-cru_ts31 = '/Data/Base_Data/Climate/World/CRU_grids/CRU_TS31/cru_ts_3_10.1901.2009.cld.dat.nc'
-cl20_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_v2/cru_ts20/cld/akcan'
-template_raster_fn = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/templates/tas_mean_C_AR5_GFDL-CM3_historical_01_1860.tif'
-anomalies_calc_type = 'relative' # 'absolute'
-downscaling_operation = 'mult' # 'add', 'div'
+# ncores = '10'
+# base_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_october_final/cru_ts31'
+# cru_ts31 = '/Data/Base_Data/Climate/World/CRU_grids/CRU_TS31/cru_ts_3_10.1901.2009.cld.dat.nc'
+# cl20_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_v2/cru_ts20/cld/akcan'
+# template_raster_fn = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/templates/tas_mean_C_AR5_GFDL-CM3_historical_01_1860.tif'
+# anomalies_calc_type = 'relative' # 'absolute'
+# downscaling_operation = 'mult' # 'add', 'div'
 
-climatology_begin = '1961'
-climatology_end = '1990'
-year_begin = '1901'
-year_end = '2009'
-variable = 'cld'
-metric = 'pct'
+# climatology_begin = '1961'
+# climatology_end = '1990'
+# year_begin = '1901'
+# year_end = '2009'
+# variable = 'cld'
+# metric = 'pct'
 
-args_tuples = [ ('hi', cru_ts31), ('ci', cl20_path), ('tr', template_raster_fn), 
-				('base', base_path), ('bt', year_begin), ('et', year_end), 
-				('cbt', climatology_begin), ('cet', climatology_end), 
-				('nc', ncores), ('at', anomalies_calc_type), ('m', metric), 
-				('dso', downscaling_operation), ('v', variable) ]
+# args_tuples = [ ('hi', cru_ts31), ('ci', cl20_path), ('tr', template_raster_fn), 
+# 				('base', base_path), ('bt', year_begin), ('et', year_end), 
+# 				('cbt', climatology_begin), ('cet', climatology_end), 
+# 				('nc', ncores), ('at', anomalies_calc_type), ('m', metric), 
+# 				('dso', downscaling_operation), ('v', variable) ]
 
-args = ''.join([ ' -'+flag+' '+value for flag, value in args_tuples ])
-os.system( 'python cru_ts31_downscaling.py ' + args )
+# args = ''.join([ ' -'+flag+' '+value for flag, value in args_tuples ])
+# os.system( 'python cru_ts31_to_cl20_downscaling.py ' + args )
 
