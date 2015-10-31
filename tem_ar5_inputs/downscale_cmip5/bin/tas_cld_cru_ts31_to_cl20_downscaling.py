@@ -27,7 +27,6 @@ def write_gtiff( output_arr, template_meta, output_filename, compress=True ):
 		* this can also be added (along with many other gdal creation options)
 		to the template meta as a key value pair template_meta.update( compress='lzw' ).
 		See Rasterio documentation for more details. This is just a common one that is 
-		supported here.
 
 	RETURNS:
 	--------
@@ -54,7 +53,7 @@ def write_gtiff( output_arr, template_meta, output_filename, compress=True ):
 		for band in range( 1, nbands+1 ):
 			out.write( output_arr[ band-1, ... ], band )
 	return output_filename
-def shiftgrid(lon0,datain,lonsin,start=True,cyclic=360.0):
+def shiftgrid( lon0, datain, lonsin, start=True, cyclic=360.0 ):
 	import numpy as np
 	"""
 	Shift global lat/lon grid east or west.
@@ -117,12 +116,12 @@ def bounds_to_extent( bounds ):
 	return [ (l,b), (r,b), (r,t), (l,t), (l,b) ]
 def padded_bounds( rst, npixels, crs ):
 	'''
-	convert the extents of 2 overlapping rasters to a shapefile with 
+	convert the extents of 2 overlapping rasters to a shapefile with
 	an expansion of the intersection of the rasters extents by npixels
 	rst1: rasterio raster object
 	rst2: rasterio raster object
-	npixels: tuple of 4 (left(-),bottom(-),right(+),top(+)) number of pixels to 
-		expand in each direction. for 5 pixels in each direction it would look like 
+	npixels: tuple of 4 (left(-),bottom(-),right(+),top(+)) number of pixels to
+		expand in each direction. for 5 pixels in each direction it would look like
 		this: (-5. -5. 5, 5) or just in the right and top directions like this:
 		(0,0,5,5).
 	crs: epsg code or proj4string defining the geospatial reference 
@@ -134,7 +133,6 @@ def padded_bounds( rst, npixels, crs ):
 
 	resolution = rst.res[0]
 	new_bounds = [ bound+(expand*resolution) for bound, expand in zip( rst.bounds, npixels ) ]
-	# new_ext = bounds_to_extent( new_bounds )
 	return new_bounds
 def xyz_to_grid( x, y, z, grid, method='cubic', output_dtype=np.float32 ):
 	'''
@@ -154,7 +152,7 @@ def xyz_to_grid( x, y, z, grid, method='cubic', output_dtype=np.float32 ):
 	zi = griddata( (x, y), z, grid, method=method )
 	zi = np.flipud( zi.astype( output_dtype ) )
 	return zi
-def run( df, meshgrid_tuple, lons_pcll, template_raster_fn, src_transform, src_crs, src_nodata, output_filename ):
+def generate_anomalies( df, meshgrid_tuple, lons_pcll, template_raster_fn, src_transform, src_crs, src_nodata, output_filename, *args, **kwargs ):
 	'''
 	run the interpolation to a grid, and reprojection / resampling to the Alaska / Canada rasters
 	extent, resolution, origin (template_raster).
@@ -168,6 +166,13 @@ def run( df, meshgrid_tuple, lons_pcll, template_raster_fn, src_transform, src_c
 
 	'''
 	template_raster = rasterio.open( template_raster_fn )
+	template_meta = template_raster.meta
+	if 'transform' in template_meta.keys():
+		template_meta.pop( 'transform' )
+	# update some meta configs
+	template_meta.update( crs={'init':'epsg:3338'} )
+	template_meta.update( compress='lzw' )
+
 	interp_arr = xyz_to_grid( np.array(df['lon'].tolist()), \
 					np.array(df['lat'].tolist()), \
 					np.array(df['anom'].tolist()), grid=meshgrid_tuple, method='cubic' ) 
@@ -176,16 +181,14 @@ def run( df, meshgrid_tuple, lons_pcll, template_raster_fn, src_transform, src_c
 	interp_arr[ np.isnan( interp_arr ) ] = src_nodata
 	dat, lons = shiftgrid( 180., interp_arr, lons_pcll, start=False )
 	output_arr = np.empty_like( template_raster.read( 1 ) )
-	# mask it with the internal mask in the template raster, where 0 is oob.
-	output_arr = np.ma.masked_where( template_raster.read_masks( 1 ) == 0, output_arr )
-	template_meta = template_raster.meta
-
-	if 'transform' in template_meta.keys():
-		template_meta.pop( 'transform' )
 
 	reproject( dat, output_arr, src_transform=src_transform, src_crs=src_crs, src_nodata=src_nodata, \
 				dst_transform=template_meta['affine'], dst_crs=template_meta['crs'],\
-				dst_nodata=None, resampling=RESAMPLING.nearest, num_threads=1, SOURCE_EXTRA=1000 )	
+				dst_nodata=None, resampling=RESAMPLING.cubic_spline, num_threads=1, SOURCE_EXTRA=1000 )	
+	# mask it with the internal mask in the template raster, where 0 is oob.
+	output_arr = np.ma.masked_where( template_raster.read_masks( 1 ) == 0, output_arr )
+	output_arr.fill_value = template_meta[ 'nodata' ]
+	output_arr = output_arr.filled()
 	return write_gtiff( output_arr, template_meta, output_filename, compress=True )
 def fn_month_grouper( x ):
 	'''
@@ -194,12 +197,12 @@ def fn_month_grouper( x ):
 	return os.path.splitext(os.path.basename(x))[0].split( '_' )[5]
 def downscale_cru_historical( file_list, cru_cl20_arr, output_path, downscaling_operation ):
 	'''
-	take a list of cru_historical anomalies filenames, groupby month, 
+	take a list of cru_historical anomalies filenames, groupby month,
 	then downscale with the cru_cl20 climatology as a numpy 2d ndarray
-	that is also on the same grid as the anomalies files.  
+	that is also on the same grid as the anomalies files.
 	(intended to be the akcan 1km/2km extent).
 
-	operation can be one of 'mult', 'add', 'div' and represents the 
+	operation can be one of 'mult', 'add', 'div' and represents the
 	downscaling operation to be use to scale the anomalies on top of the baseline.
 	this is based on how the anomalies were initially calculated.
 
@@ -209,7 +212,7 @@ def downscale_cru_historical( file_list, cru_cl20_arr, output_path, downscaling_
 	'''
 	from functools import partial
 	
-	def f( anomaly_fn, baseline_arr, output_path ):
+	def f( anomaly_fn, baseline_arr, output_path, downscaling_operation ):
 		def add( cru, anom ):
 			return cru + anom
 		def mult( cru, anom ):
@@ -219,27 +222,31 @@ def downscale_cru_historical( file_list, cru_cl20_arr, output_path, downscaling_
 			# this one may not be useful, but the placeholder is here 
 			return NotImplementedError
 
-
 		cru_ts31 = rasterio.open( anomaly_fn )
 		meta = cru_ts31.meta
-		meta.update( compress='lzw' )
+		meta.update( compress='lzw', crs={'init':'epsg:3338'} )
 		cru_ts31 = cru_ts31.read( 1 )
 		operation_switch = { 'add':add, 'mult':mult, 'div':div }
-		downscaled = operation_switch[ downscaling_operation ]( baseline_arr, cru_ts31 )
 		# this is hardwired stuff for this fairly hardwired script.
 		output_filename = os.path.basename( anomaly_fn ).replace( 'anom', 'downscaled' )
 		output_filename = os.path.join( output_path, output_filename )
-		output_arr = baseline_arr * cru_ts31 # multiply since it was relative anomalies
+		# both files need to be masked here since we use a RIDICULOUS oob value...
+		# for both tas and cld, values less than -200 are out of the range of acceptable values and it
+		# grabs the -3.4... mask values. so lets mask using this
+		baseline_arr = np.ma.masked_where( baseline_arr < -200, baseline_arr )
+		cru_ts31 = np.ma.masked_where( cru_ts31 < -200, cru_ts31 )
+
+		output_arr = operation_switch[ downscaling_operation ]( baseline_arr, cru_ts31 )
+		output_arr[ np.isinf(output_arr) ] = meta[ 'nodata' ]
 		if 'transform' in meta.keys():
 			meta.pop( 'transform' )
 		with rasterio.open( output_filename, 'w', **meta ) as out:
 			out.write( output_arr, 1 )
 		return output_filename
 		
-	partial_f = partial( f, baseline_arr=cru_cl20_arr, output_path=output_path )
+	partial_f = partial( f, baseline_arr=cru_cl20_arr, output_path=output_path, downscaling_operation=downscaling_operation )
 	cru_ts31 = file_list.apply( lambda fn: partial_f( anomaly_fn=fn ) )
 	return output_path
-
 
 if __name__ == '__main__':
 	import rasterio, xray, os, glob, affine
@@ -254,7 +261,7 @@ if __name__ == '__main__':
 
 	# parse the commandline arguments
 	parser = argparse.ArgumentParser( description='preprocess cmip5 input netcdf files to a common type and single files' )
-	parser.add_argument( "-hi", "--cru_ts31", action='store', dest='cru_ts31', type=str, help="path to historical CRU TS3.1 input NetCDF file" )
+	parser.add_argument( "-hi", "--cru_ts31", action='store', dest='cru_ts31', type=str, help="path to historical tas/cld CRU TS3.1 input NetCDF file" )
 	parser.add_argument( "-ci", "--cl20_path", action='store', dest='cl20_path', type=str, help="path to historical CRU TS2.0 Climatology input directory in single-band GTiff Format" )
 	parser.add_argument( "-tr", "--template_raster_fn", action='store', dest='template_raster_fn', type=str, help="path to ALFRESCO Formatted template raster to match outputs to." )
 	parser.add_argument( "-base", "--base_path", action='store', dest='base_path', type=str, help="string path to the folder to put the output files into" )
@@ -349,7 +356,7 @@ if __name__ == '__main__':
 	src_nodata = -9999.0
 		
 	# output_filenames setup
-	years = np.arange( year_begin, year_end+1, 1 ).astype( str ).tolist()
+	years = np.arange( int(year_begin), int(year_end)+1, 1 ).astype( str ).tolist()
 	months = [ i if len(i)==2 else '0'+i for i in np.arange( 1, 12+1, 1 ).astype( str ).tolist() ]
 	month_year = [ (month, year) for year in years for month in months ]
 	output_filenames = [ os.path.join( anomalies_path, '_'.join([ variable,metric,'cru_ts31_anom',month,year])+'.tif' ) 
@@ -363,7 +370,7 @@ if __name__ == '__main__':
 
 	# interpolate / reproject / resample the anomalies to match template_raster_fn
 	pool = mp.Pool( processes=ncores )
-	out = pool.map( lambda args: run( **args ), args_list )
+	out = pool.map( lambda args: generate_anomalies( **args ), args_list )
 	pool.close()
 
 	# To Complete the CRU TS3.1 Downscaling we need the following: 
@@ -390,28 +397,55 @@ if __name__ == '__main__':
 # # input args -- argparse it
 # import os
 # os.chdir( '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/CODE/tem_ar5_inputs/downscale_cmip5/bin' )
-# ncores = '10'
+# ncores = '5'
 # base_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_october_final/cru_ts31'
-# cru_ts31 = '/Data/Base_Data/Climate/World/CRU_grids/CRU_TS31/cru_ts_3_10.1901.2009.tmp.nc' # cru_ts_3_10.1901.2009.reh.dat.nc'
-# cl20_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_v2/cru_ts20/tas/akcan'
+# cru_ts31 = '/Data/Base_Data/Climate/World/CRU_grids/CRU_TS31/cru_ts_3_10.1901.2009.cld.dat.nc' # 'cru_ts_3_10.1901.2009.tmp.nc'
+# cl20_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_october_final/cru_cl20/tas/akcan'
 # template_raster_fn = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/templates/tas_mean_C_AR5_GFDL-CM3_historical_01_1860.tif'
-# anomalies_calc_type = 'absolute' # 'relative'
-# downscaling_operation = 'add' # 'mult', 'div'
+# anomalies_calc_type = 'relative' # 'absolute'
+# downscaling_operation = 'mult' # 'add'
 
 # climatology_begin = '1961'
 # climatology_end = '1990'
 # year_begin = '1901'
 # year_end = '2009'
-# variable = 'hur'
-# metric = 'C'
+# variable = 'cld' # 'tas'
+# metric = 'pct' # 'C'
 
 # args_tuples = [ ('hi', cru_ts31), ('ci', cl20_path), ('tr', template_raster_fn), 
-# 				('base', base_path), ('bt', year_begin), ('et', year_end), 
-# 				('cbt', climatology_begin), ('cet', climatology_end), 
+# 				('base', base_path), ('bt', year_begin), ('et', year_end),
+# 				('cbt', climatology_begin), ('cet', climatology_end),
 # 				('nc', ncores), ('at', anomalies_calc_type), ('m', metric), 
 # 				('dso', downscaling_operation), ('v', variable) ]
 
 # args = ''.join([ ' -'+flag+' '+value for flag, value in args_tuples ])
-# os.system( 'python cru_ts31_to_cl20_downscaling.py ' + args )
+# os.system( 'ipython2.7 -- tas_cld_cru_ts31_to_cl20_downscaling.py ' + args )
 
+# # # # #TAS# # # # # # # 
+# # input args -- argparse it
+# import os
+# os.chdir( '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/CODE/tem_ar5_inputs/downscale_cmip5/bin' )
+# ncores = '5'
+# base_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_october_final/cru_ts31'
+# cru_ts31 = '/Data/Base_Data/Climate/World/CRU_grids/CRU_TS31/cru_ts_3_10.1901.2009.tmp.nc'
+# cl20_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_october_final/cru_cl20/tas/akcan'
+# template_raster_fn = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/templates/tas_mean_C_AR5_GFDL-CM3_historical_01_1860.tif'
+# anomalies_calc_type = 'absolute'
+# downscaling_operation = 'add'
+
+# climatology_begin = '1961'
+# climatology_end = '1990'
+# year_begin = '1901'
+# year_end = '2009'
+# variable = 'tas'
+# metric = 'C'
+
+# args_tuples = [ ('hi', cru_ts31), ('ci', cl20_path), ('tr', template_raster_fn), 
+# 				('base', base_path), ('bt', year_begin), ('et', year_end),
+# 				('cbt', climatology_begin), ('cet', climatology_end),
+# 				('nc', ncores), ('at', anomalies_calc_type), ('m', metric), 
+# 				('dso', downscaling_operation), ('v', variable) ]
+
+# args = ''.join([ ' -'+flag+' '+value for flag, value in args_tuples ])
+# os.system( 'ipython2.7 -- tas_cld_cru_ts31_to_cl20_downscaling.py ' + args )
 

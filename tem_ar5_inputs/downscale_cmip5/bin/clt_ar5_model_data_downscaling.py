@@ -1,6 +1,61 @@
 # # # # #
 # Tool to downscale the CMIP5 data from the PCMDI group. 
 # # # # #
+def shiftgrid(lon0,datain,lonsin,start=True,cyclic=360.0):
+	import numpy as np
+	"""
+	Shift global lat/lon grid east or west.
+	.. tabularcolumns:: |l|L|
+	==============   ====================================================
+	Arguments        Description
+	==============   ====================================================
+	lon0             starting longitude for shifted grid
+					 (ending longitude if start=False). lon0 must be on
+					 input grid (within the range of lonsin).
+	datain           original data with longitude the right-most
+					 dimension.
+	lonsin           original longitudes.
+	==============   ====================================================
+	.. tabularcolumns:: |l|L|
+	==============   ====================================================
+	Keywords         Description
+	==============   ====================================================
+	start            if True, lon0 represents the starting longitude
+					 of the new grid. if False, lon0 is the ending
+					 longitude. Default True.
+	cyclic           width of periodic domain (default 360)
+	==============   ====================================================
+	returns ``dataout,lonsout`` (data and longitudes on shifted grid).
+	"""
+	if np.fabs(lonsin[-1]-lonsin[0]-cyclic) > 1.e-4:
+		# Use all data instead of raise ValueError, 'cyclic point not included'
+		start_idx = 0
+	else:
+		# If cyclic, remove the duplicate point
+		start_idx = 1
+	if lon0 < lonsin[0] or lon0 > lonsin[-1]:
+		raise ValueError('lon0 outside of range of lonsin')
+	i0 = np.argmin(np.fabs(lonsin-lon0))
+	i0_shift = len(lonsin)-i0
+	if np.ma.isMA(datain):
+		dataout  = np.ma.zeros(datain.shape,datain.dtype)
+	else:
+		dataout  = np.zeros(datain.shape,datain.dtype)
+	if np.ma.isMA(lonsin):
+		lonsout = np.ma.zeros(lonsin.shape,lonsin.dtype)
+	else:
+		lonsout = np.zeros(lonsin.shape,lonsin.dtype)
+	if start:
+		lonsout[0:i0_shift] = lonsin[i0:]
+	else:
+		lonsout[0:i0_shift] = lonsin[i0:]-cyclic
+	dataout[...,0:i0_shift] = datain[...,i0:]
+	if start:
+		lonsout[i0_shift:] = lonsin[start_idx:i0+start_idx]+cyclic
+	else:
+		lonsout[i0_shift:] = lonsin[start_idx:i0+start_idx]
+	dataout[...,i0_shift:] = datain[...,start_idx:i0+start_idx]
+	return dataout,lonsout
 def cru_generator( n, cru_clim_list ):
 	'''
 	generator that will produce the cru climatologies with a
@@ -16,7 +71,7 @@ def standardized_fn_to_vars( fn ):
 	fn = os.path.basename( fn )
 	fn_list = fn.split( '.' )[0].split( '_' )
 	return { i:j for i,j in zip( name_convention, fn_list )}
-def downscale( src, dst, cru, src_crs, src_affine, dst_crs, dst_affine, output_filename, dst_meta, \
+def downscale( src, dst, cru, src_crs, src_affine, dst_crs, dst_affine, output_filename, dst_meta, variable,\
 		method='cubic_spline', operation='add', output_dtype='float32', **kwargs ):
 	'''
 	operation can be one of two keywords for the operation to perform the delta downscaling
@@ -54,10 +109,18 @@ def downscale( src, dst, cru, src_crs, src_affine, dst_crs, dst_affine, output_f
 	operation_switch = { 'add':add, 'mult':mult, 'div':div }
 	downscaled = operation_switch[ operation ]( cru, out )
 
+	# reset any > 100 values to 99 if the variable is cld or hur
+	if variable == 'clt' or variable == 'hur' or variable == 'cld':
+		downscaled[ downscaled > 100 ] = 99
+
+	# give the proper fill values to the oob regions
+	downscaled.fill_value = dst_meta['nodata']
+	downscaled = downscaled.filled()
+
 	# this is a geotiff creator so lets pass in the lzw compression
 	dst_meta.update( compress='lzw' )
 	with rasterio.open( output_filename, 'w', **dst_meta ) as out:
-		out.write_band( 1, downscaled.astype( dtypes_switch[ output_dtype ] ).data )
+		out.write( downscaled.astype( dtypes_switch[ output_dtype ] ), 1 )
 	return output_filename
 def run( args ):
 	''' 
@@ -73,14 +136,13 @@ if __name__ == '__main__':
 	import os, sys, re, xray, rasterio, glob, argparse
 	from rasterio import Affine as A
 	from rasterio.warp import reproject, RESAMPLING
-	from mpl_toolkits.basemap import shiftgrid, addcyclic
 	from pathos import multiprocessing as mp
 
 	# parse the commandline arguments
 	parser = argparse.ArgumentParser( description='preprocess cmip5 input netcdf files to a common type and single files' )
 	parser.add_argument( "-mi", "--modeled_fn", nargs='?', const=None, action='store', dest='modeled_fn', type=str, help="path to modeled input filename (NetCDF); default:None" )
 	parser.add_argument( "-hi", "--historical_fn", nargs='?', const=None, action='store', dest='historical_fn', type=str, help="path to historical input filename (NetCDF); default:None" )
-	parser.add_argument( "-o", "--output_dir", action='store', dest='output_dir', type=str, help="string path to the output folder containing the new downscaled outputs" )
+	parser.add_argument( "-o", "--output_path", action='store', dest='output_path', type=str, help="string path to the output folder containing the new downscaled outputs" )
 	parser.add_argument( "-bt", "--begin_time", action='store', dest='begin_time', type=str, help="string in format YYYYMM of the beginning month/year" )
 	parser.add_argument( "-et", "--end_time", action='store', dest='end_time', type=str, help="string in format YYYYMM of the ending month/year" )
 	parser.add_argument( "-cbt", "--climatology_begin_time", nargs='?', const='196101', action='store', dest='climatology_begin', type=str, help="string in format YYYYMM or YYYY of the beginning month and potentially (year) of the climatology period" )
@@ -90,6 +152,7 @@ if __name__ == '__main__':
 	parser.add_argument( "-at", "--anomalies_calc_type", nargs='?', const='absolute', action='store', dest='anomalies_calc_type', type=str, help="string of 'proportional' or 'absolute' to inform of anomalies calculation type to perform." )
 	parser.add_argument( "-m", "--metric", nargs='?', const='metric', action='store', dest='metric', type=str, help="string of whatever the metric type is of the outputs to put in the filename." )
 	parser.add_argument( "-dso", "--downscale_operation", action='store', dest='downscale_operation', type=str, help="string of 'add', 'mult', 'div', which refers to the type or downscaling operation to use." )
+	parser.add_argument( "-nc", "--ncores", nargs='?', const=2, action='store', dest='ncores', type=int, help="integer valueof number of cores to use. default:2" )
 
 	# parse args
 	args = parser.parse_args()
@@ -97,7 +160,7 @@ if __name__ == '__main__':
 	# unpack args
 	modeled_fn = args.modeled_fn
 	historical_fn = args.historical_fn
-	output_dir = args.output_dir
+	output_path = args.output_path
 	begin_time = args.begin_time
 	end_time = args.end_time
 	climatology_begin = args.climatology_begin
@@ -107,6 +170,7 @@ if __name__ == '__main__':
 	anomalies_calc_type = args.anomalies_calc_type
 	metric = args.metric
 	downscale_operation = args.downscale_operation
+	ncores = args.ncores
 
 	# * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 	# [NOTE]: hardwired raster metadata meeting the ALFRESCO Model's needs for 
@@ -145,6 +209,13 @@ if __name__ == '__main__':
 		# generate climatology / anomalies
 		clim_ds = clim_ds.loc[ {'time':slice(climatology_begin,climatology_end)} ]
 		climatology = clim_ds.groupby( 'time.month' ).mean( 'time' )
+
+		# find the begin/end years of the prepped files
+		dates = ds.time.to_pandas()
+		years = dates.apply( lambda x: x.year )
+		begin_time = years.min()
+		end_time = years.max()
+
 		del clim_ds
 	elif historical_fn is not None and modeled_fn is None:
 		# parse the input name for some file metadata
@@ -159,8 +230,26 @@ if __name__ == '__main__':
 		# generate climatology / anomalies
 		climatology = ds.loc[ {'time':slice(climatology_begin,climatology_end)} ]
 		climatology = climatology.groupby( 'time.month' ).mean( 'time' )
+
+		# find the begin/end years of the prepped files
+		dates = ds.time.to_pandas()
+		years = dates.apply( lambda x: x.year )
+		begin_time = years.min()
+		end_time = years.max()
+
 	else:
 		NameError( 'ERROR: must have both modeled_fn and historical_fn, or just historical_fn' )
+
+	# standardize the output pathing
+	if output_naming_dict[ 'variable' ] == 'clt':
+		variable_out = 'cld'
+	else:
+		variable_out = output_naming_dict[ 'variable' ]
+
+	output_path = os.path.join( output_path, 'ar5', output_naming_dict['model'], variable_out, 'downscaled' )
+	if not os.path.exists( output_path ):
+		os.makedirs( output_path )
+
 
 	# if there is a pressure level to extract, extract it
 	if plev is not None:
@@ -200,10 +289,11 @@ if __name__ == '__main__':
 				'compress':'lzw' }
 	# build some filenames for the outputs to be generated
 	months = [ '01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12' ]
-	years = [ str(year) for year in range( int(begin_time[:4]), int(end_time[:4]) + 1, 1 ) ]
+	years = [ str(year) for year in range( begin_time, end_time + 1, 1 ) ]
 	# combine the months and the years
 	combinations = [ (month, year) for year in years for month in months ]
-	output_filenames = [ os.path.join( output_dir, '_'.join([output_naming_dict['variable'], 'metric', output_naming_dict['model'], output_naming_dict['scenario'], output_naming_dict['experiment'], month, year]) + '.tif' ) for month, year in combinations ]
+
+	output_filenames = [ os.path.join( output_path, '_'.join([variable_out, 'metric', output_naming_dict['model'], output_naming_dict['scenario'], output_naming_dict['experiment'], month, year]) + '.tif' ) for month, year in combinations ]
 
 	# load the baseline CRU CL2.0 data 
 	# [NOTE]: THIS ASSUMES THEY ARE THE ONLY FILES IN THE DIRECTORY -- COULD BE A GOTCHA
@@ -218,48 +308,158 @@ if __name__ == '__main__':
 	del climatology, anomalies
 
 	# run in parallel using PATHOS
-	pool = mp.Pool( 4 )
+	pool = mp.Pool( processes=ncores )
 	args_list = zip( np.vsplit( dat, time_len ), output_filenames, cru_gen )
 	del dat, cru_gen, cru_stack
 
 	out = pool.map( run, [{'src':src, 'output_filename':fn, 'dst':dst, 'cru':cru, 'src_crs':meta_4326[ 'crs' ], 'src_affine':meta_4326[ 'affine' ], \
-							'dst_crs':meta_3338[ 'crs' ], 'dst_affine':meta_3338[ 'affine' ], 'dst_meta':meta_3338, 'operation':downscale_operation } \
+							'dst_crs':meta_3338[ 'crs' ], 'dst_affine':meta_3338[ 'affine' ], 'dst_meta':meta_3338, 'operation':downscale_operation, 'variable':variable } \
 							for src,fn,cru in args_list ] )
 	pool.close()
 
 
 # # # # # # # # # SOME TESTING AND EXAMPLE GENERATION AREA # # # # # # # # # 
-# some setup pathing <<-- THIS TO BE CONVERTED TO ARGUMENTS AT COMMAND LINE
-# historical_fn = '/workspace/Shared/Tech_Projects/ESGF_Data_Access/project_data/data/prepped/GFDL-CM3/hur/hur_Amon_GFDL-CM3_historical_r1i1p1_186001_200512.nc' 
-# modeled_fn = '/workspace/Shared/Tech_Projects/ESGF_Data_Access/project_data/data/prepped/GFDL-CM3/hur/hur_Amon_GFDL-CM3_rcp26_r1i1p1_200601_210012.nc' 
+# TO RUN THE CLOUDS DOWNSCALING USE THIS EXAMPLE:
+# import os
+# import pandas as pd
+# import numpy as np
 
-# variable = 'hur'
-# metric = 'pct'
-# output_dir = '/home/UA/malindgren/Documents/hur/akcan/new'
-# time_begin = '2006-01' # will change for future and historical
-# time_end = '2100-12' # will change for future and historical
-# climatology_begin = '1961'
-# climatology_end = '1990'
-# plev = 1000 # this is in millibar data, this is also a None default!
-# cru_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_ts20/akcan'
-# anomalies_calc_type = 'proportional'
+# # change to the script repo
+# os.chdir( '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/CODE/tem_ar5_inputs/downscale_cmip5/bin' )
+
+# # to run the futures:
+# prepped_dir = '/workspace/Shared/Tech_Projects/ESGF_Data_Access/project_data/data/cmip5_clt_nonstandard/prepped'
+# file_groups = [ [os.path.join(root,f) for f in files] for root, sub, files in os.walk( prepped_dir ) if len(files) > 0 and files[0].endswith('.nc') ]
+
+# def make_rcp_file_pairs( file_group ):
+# 	# there is only one historical per group since these have been pre-processed to a single file and date range
+# 	historical = [ file_group.pop( count ) for count, i in enumerate( file_group ) if 'historical' in i ]
+# 	return zip( np.repeat( historical, len(file_group) ).tolist(), file_group )
+
+# grouped_pairs = [ make_rcp_file_pairs( file_group ) for file_group in file_groups ]
+# for file_group in grouped_pairs:
+# 	for historical_fn, modeled_fn in file_group:
+# 		output_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_october_final'
+# 		climatology_begin = '1961-01'
+# 		climatology_end = '1990-12'
+# 		cru_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_october_final/cru_cl20/cld/akcan'
+# 		anomalies_calc_type = 'proportional'
+# 		metric = 'pct'
+# 		downscale_operation = 'mult'
+# 		ncores = '10'
+# 		# future modeled data
+# 		# # build the args
+# 		args_tuples = [ ( 'mi', modeled_fn ),
+# 						( 'hi', historical_fn ),
+# 						( 'o', output_path ),
+# 						( 'cbt', climatology_begin ),
+# 						( 'cet', climatology_end ),
+# 						( 'cru', cru_path ),
+# 						( 'at', anomalies_calc_type ),
+# 						( 'm', metric ),
+# 						( 'dso', downscale_operation ),
+# 						( 'nc', ncores ) ]
+
+# 		args = ''.join([ ' -'+flag+' '+value for flag, value in args_tuples ])
+
+# 		ncores = '10'
+# 		os.system( 'python clt_ar5_model_data_downscaling.py ' + args )
+
+# 		del modeled_fn
+
+# 		# now historical modeled data
+# 		# # build the args
+# 		args_tuples = [	( 'hi', historical_fn ),
+# 						( 'o', output_path ),
+# 						( 'cbt', climatology_begin ),
+# 						( 'cet', climatology_end ),
+# 						( 'cru', cru_path ),
+# 						( 'at', anomalies_calc_type ),
+# 						( 'm', metric ),
+# 						( 'dso', downscale_operation ),
+# 						( 'nc', ncores ) ]
+
+# 		args = ''.join([ ' -'+flag+' '+value for flag, value in args_tuples ])
+
+# 		os.system( 'python clt_ar5_model_data_downscaling.py ' + args )
+
+# # TO RUN THE TEMPERATURE DOWNSCALING USE THIS EXAMPLE:
+# import os
+# import pandas as pd
+# import numpy as np
+
+# # change to the script repo
+# os.chdir( '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/CODE/tem_ar5_inputs/downscale_cmip5/bin' )
+
+# # to run the futures:
+# prepped_dir = '/workspace/Shared/Tech_Projects/ESGF_Data_Access/project_data/data/prepped'
+# file_groups = [ [os.path.join(root,f) for f in files] for root, sub, files in os.walk( prepped_dir ) if len(files) > 0 and files[0].endswith('.nc') ]
+
+# def make_rcp_file_pairs( file_group ):
+# 	# there is only one historical per group since these have been pre-processed to a single file and date range
+# 	historical = [ file_group.pop( count ) for count, i in enumerate( file_group ) if 'historical' in i ]
+# 	return zip( np.repeat( historical, len(file_group) ).tolist(), file_group )
+
+# grouped_pairs = [ make_rcp_file_pairs( file_group ) for file_group in file_groups ]
+# for file_group in grouped_pairs:
+# 	for historical_fn, modeled_fn in file_group:
+# 		output_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_october_final'
+# 		climatology_begin = '1961-01'
+# 		climatology_end = '1990-12'
+# 		cru_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_october_final/cru_cl20/tas/akcan'
+# 		anomalies_calc_type = 'absolute'
+# 		metric = 'C'
+# 		downscale_operation = 'add'
+# 		ncores = '10'
+# 		# future modeled data
+# 		# # build the args
+# 		args_tuples = [ ( 'mi', modeled_fn ),
+# 						( 'hi', historical_fn ),
+# 						( 'o', output_path ),
+# 						( 'cbt', climatology_begin ),
+# 						( 'cet', climatology_end ),
+# 						( 'cru', cru_path ),
+# 						( 'at', anomalies_calc_type ),
+# 						( 'm', metric ),
+# 						( 'dso', downscale_operation ),
+# 						( 'nc', ncores ) ]
+
+# 		args = ''.join([ ' -'+flag+' '+value for flag, value in args_tuples ])
+
+# 		ncores = '10'
+# 		os.system( 'python clt_ar5_model_data_downscaling.py ' + args )
+
+# 		del modeled_fn
+
+# 		# now historical modeled data
+# 		# # build the args by pop(-ping) out the first entry which is modeled_fn
+# 		args_tuples.pop(0)
+# 		args = ''.join([ ' -'+flag+' '+value for flag, value in args_tuples ])
+
+# 		os.system( 'python clt_ar5_model_data_downscaling.py ' + args )
 
 
-# unpack args
-# modeled_fn = '/workspace/Shared/Tech_Projects/ESGF_Data_Access/project_data/data/prepped/GFDL-CM3/hur/hur_Amon_GFDL-CM3_rcp26_r1i1p1_200601_210012.nc'
-# historical_fn = '/workspace/Shared/Tech_Projects/ESGF_Data_Access/project_data/data/prepped/GFDL-CM3/hur/hur_Amon_GFDL-CM3_historical_r1i1p1_186001_200512.nc'
-# output_dir = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/downscaled'
-# begin_time = '1860-01'
-# end_time = '2005-12'
-# climatology_begin = '1961-01'
-# climatology_end = '1990-12'
-# plev = 1000
-# cru_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_ts20/akcan/hur'
-# anomalies_calc_type = 'proportional'
-# metric = 'mean'
-# downscale_operation = 'mult'
 
-# test = map( run, [{'src':src, 'output_filename':fn, 'dst':dst, 'cru':cru, 'src_crs':meta_4326[ 'crs' ], 'src_affine':meta_4326[ 'affine' ], \
-# 							'dst_crs':meta_3338[ 'crs' ], 'dst_affine':meta_3338[ 'affine' ], 'dst_meta':meta_3338, 'operation':downscale_operation } \
-# 							for src,fn,cru in zip( np.vsplit( dat, time_len ), output_filenames, cru_gen )[:1]] )
 
+
+# # begin_time = '1860-01'
+# # end_time = '2005-12'
+# # 				( 'bt', begin_time ),
+# # 				( 'et', end_time ),
+
+# # src=src; output_filename=fn; dst=dst; cru=cru; src_crs=meta_4326[ 'crs' ]; src_affine=meta_4326[ 'affine' ]; dst_crs=meta_3338[ 'crs' ]; dst_affine=meta_3338[ 'affine' ]; dst_meta=meta_3338; operation=downscale_operation, variable=variable
+
+# # some setup pathing <<-- THIS TO BE CONVERTED TO ARGUMENTS AT COMMAND LINE
+# # historical_fn = '/workspace/Shared/Tech_Projects/ESGF_Data_Access/project_data/data/cmip5_clt_nonstandard/prepped/GFDL-CM3/clt/clt_Amon_GFDL-CM3_historical_r1i1p1_186001_200512.nc'
+# # modeled_fn = '/workspace/Shared/Tech_Projects/ESGF_Data_Access/project_data/data/cmip5_clt_nonstandard/prepped/GFDL-CM3/clt/clt_Amon_GFDL-CM3_rcp26_r1i1p1_200601_210012.nc'
+
+# # variable = 'cld'
+# # metric = 'pct'
+# # # output_path = '/home/UA/malindgren/Documents/hur/akcan/new'
+# # time_begin = '2006-01' # will change for future and historical
+# # time_end = '2100-12' # will change for future and historical
+# # climatology_begin = '1961'
+# # climatology_end = '1990'
+# # plev = 1000 # this is in millibar data, this is also a None default!
+# # cru_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_ts20/akcan'
+# # anomalies_calc_type = 'proportional'

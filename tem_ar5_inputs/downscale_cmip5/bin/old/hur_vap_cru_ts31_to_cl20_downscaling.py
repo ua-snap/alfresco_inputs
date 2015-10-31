@@ -54,7 +54,7 @@ def write_gtiff( output_arr, template_meta, output_filename, compress=True ):
 		for band in range( 1, nbands+1 ):
 			out.write( output_arr[ band-1, ... ], band )
 	return output_filename
-def shiftgrid(lon0,datain,lonsin,start=True,cyclic=360.0):
+def shiftgrid( lon0, datain, lonsin, start=True, cyclic=360.0 ):
 	import numpy as np
 	"""
 	Shift global lat/lon grid east or west.
@@ -192,6 +192,11 @@ def fn_month_grouper( x ):
 	take a filename and return the month element of the naming convention
 	'''
 	return os.path.splitext(os.path.basename(x))[0].split( '_' )[5]
+def convert_to_vap( tas_arr, hur_arr ):
+	''' create relative humidity from the CRU tas / vap '''
+	esa_arr = 6.112 * np.exp( 17.62 * tas_arr/ (243.12 + tas_arr) )
+	# esa_arr = 6.112 * np.exp( 22.46 * tas_arr / (272.62 + tas_arr) )
+	return (hur_arr*esa_arr)/100
 def downscale_cru_historical( file_list, cru_cl20_arr, output_path, downscaling_operation ):
 	'''
 	take a list of cru_historical anomalies filenames, groupby month, 
@@ -256,7 +261,8 @@ if __name__ == '__main__':
 	parser = argparse.ArgumentParser( description='preprocess cmip5 input netcdf files to a common type and single files' )
 	parser.add_argument( "-hhi", "--cru_ts31_vap", action='store', dest='cru_ts31_vap', type=str, help="path to historical CRU TS3.1 vap input NetCDF file" )
 	parser.add_argument( "-thi", "--cru_ts31_tas", action='store', dest='cru_ts31_tas', type=str, help="path to historical CRU TS3.1 tas input NetCDF file" )
-	parser.add_argument( "-ci", "--cl20_path", action='store', dest='cl20_path', type=str, help="path to historical CRU TS2.0 Climatology input directory in single-band GTiff Format" )
+	parser.add_argument( "-cit", "--cl20_tas_path", action='store', dest='cl20_tas_path', type=str, help="path to historical TAS (in output extent/res/crs) CRU TS2.0 Climatology input directory in single-band GTiff Format" )
+	parser.add_argument( "-cih", "--cl20_hur_path", action='store', dest='cl20_hur_path', type=str, help="path to historical HUR (in output extent/res/crs) CRU TS2.0 Climatology input directory in single-band GTiff Format" )
 	parser.add_argument( "-tr", "--template_raster_fn", action='store', dest='template_raster_fn', type=str, help="path to ALFRESCO Formatted template raster to match outputs to." )
 	parser.add_argument( "-base", "--base_path", action='store', dest='base_path', type=str, help="string path to the folder to put the output files into" )
 	parser.add_argument( "-bt", "--year_begin", action='store', dest='year_begin', type=int, help="string in format YYYY of the beginning year in the series" )
@@ -277,7 +283,8 @@ if __name__ == '__main__':
 	base_path = args.base_path
 	cru_ts31_vap = args.cru_ts31_vap
 	cru_ts31_tas = args.cru_ts31_tas
-	cl20_path = args.cl20_path
+	cl20_tas_path = args.cl20_tas_path
+	cl20_hur_path = args.cl20_hur_path
 	template_raster_fn = args.template_raster_fn
 	anomalies_calc_type = args.anomalies_calc_type
 	downscaling_operation = args.downscaling_operation
@@ -300,15 +307,6 @@ if __name__ == '__main__':
 
 	# open with xray
 	cru_ts31_vap = xray.open_dataset( cru_ts31_vap )
-	cru_ts31_tas = xray.open_dataset( cru_ts31_tas )
-
-	# create relative humidity from the CRU TS3.x tas / vap
-	def convert_to_hur( tas_arr, vap_arr ):
-		esa_arr = 6.112 * np.exp( 17.62 * tas_arr/ (243.12 + tas_arr) )
-		# esa_arr = 6.112 * np.exp( 22.46 * tas_arr / (272.62 + tas_arr) )
-		return vap_arr/esa_arr * 100
-
-	cru_ts31 = convert_to_hur( cru_ts31_tas, cru_ts31_hur )
 	
 	# open template raster
 	template_raster = rasterio.open( template_raster_fn )
@@ -323,7 +321,7 @@ if __name__ == '__main__':
 	# this is temporary name change for the tmp (tas) data naming diff.
 	if variable == 'tas':
 		variable = 'tmp'
-# # # [START HERE] double up the calcs from here?
+	
 	clim_ds = cru_ts31.loc[ {'time':slice(climatology_begin,climatology_end)} ]
 	climatology = clim_ds[ variable ].groupby( 'time.month' ).mean( 'time' )
 
@@ -360,7 +358,7 @@ if __name__ == '__main__':
 	src_nodata = -9999.0
 		
 	# output_filenames setup
-	years = np.arange( year_begin, year_end+1, 1 ).astype( str ).tolist()
+	years = np.arange( int(year_begin), int(year_end)+1, 1 ).astype( str ).tolist()
 	months = [ i if len(i)==2 else '0'+i for i in np.arange( 1, 12+1, 1 ).astype( str ).tolist() ]
 	month_year = [ (month, year) for year in years for month in months ]
 	output_filenames = [ os.path.join( anomalies_path, '_'.join([ variable,metric,'cru_ts31_anom',month,year])+'.tif' ) 
@@ -377,8 +375,15 @@ if __name__ == '__main__':
 	out = pool.map( lambda args: run( **args ), args_list )
 	pool.close()
 
-	# To Complete the CRU TS3.1 Downscaling we need the following: 
+	# To Complete the CRU TS3.1 Downscaling we need the following:
 	# read in the pre-processed CL2.0 Cloud Climatology
+	# open hur / tas CRU TS2.0 Climatologies and convert the hur to vap
+	tas_clim = glob.glob( os.path.join( cl20_tas_path, '*.tif' ) )
+	hur_clim = glob.glob( os.path.join( cl20_hur_path, '*.tif'  ) )
+
+	cl20 = { month:convert_to_vap( rasterio.open(tas_fn).read(1), rasterio.open(hur_fn).read(1) ) \
+				for month, tas_fn, hur_fn in zip( months, tas_clim, hur_clim) }
+
 	l = sorted( glob.glob( os.path.join( cl20_path, '*.tif' ) ) ) # this could catch you.
 	cl20_dict = { month:rasterio.open( fn ).read( 1 ) for month, fn in zip( months, l ) }
 
@@ -405,7 +410,8 @@ if __name__ == '__main__':
 # base_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_october_final/cru_ts31'
 # cru_ts31_vap = '/Data/Base_Data/Climate/World/CRU_grids/CRU_TS31/cru_ts_3_10.1901.2009.vap.nc'
 # cru_ts31_tas = '/Data/Base_Data/Climate/World/CRU_grids/CRU_TS31/cru_ts_3_10.1901.2009.tmp.nc'
-# cl20_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_v2/cru_ts20/tas/akcan'
+# cl20_tas_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_v2/cru_ts20/tas/akcan'
+# cl20_hur_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_v2/cru_ts20/hur/akcan'
 # template_raster_fn = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/templates/tas_mean_C_AR5_GFDL-CM3_historical_01_1860.tif'
 # anomalies_calc_type = 'absolute' # 'relative'
 # downscaling_operation = 'add' # 'mult', 'div'
@@ -414,8 +420,8 @@ if __name__ == '__main__':
 # climatology_end = '1990'
 # year_begin = '1901'
 # year_end = '2009'
-# variable = 'hur'
-# metric = 'C'
+# variable = 'vap'
+# metric = 'hPa'
 
 # args_tuples = [ ('hhi', cru_ts31_vap), ('thi', cru_ts31_tas), ('ci', cl20_path), ('tr', template_raster_fn), 
 # 				('base', base_path), ('bt', year_begin), ('et', year_end), 
