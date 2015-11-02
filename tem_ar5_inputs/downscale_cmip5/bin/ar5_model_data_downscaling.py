@@ -326,11 +326,12 @@ if __name__ == '__main__':
 # # change to the script repo
 # os.chdir( '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/CODE/tem_ar5_inputs/downscale_cmip5/bin' )
 
-# variable = 'cld'
+# variable = 'clt' # AR5 naming convention cloud fraction
 
 # # to run the futures:
-# prepped_dir = '/workspace/Shared/Tech_Projects/ESGF_Data_Access/project_data/data/cmip5_clt_nonstandard/prepped'
+# prepped_dir = '/workspace/Shared/Tech_Projects/ESGF_Data_Access/project_data/data/prepped/clt_prepped'
 # file_groups = [ [os.path.join(root,f) for f in files] for root, sub, files in os.walk( prepped_dir ) if len(files) > 0 and files[0].endswith('.nc') and variable in files[0] ]
+# variable = 'cld' # swap it back for the cru naming convention
 
 # def make_rcp_file_pairs( file_group ):
 # 	# there is only one historical per group since these have been pre-processed to a single file and date range
@@ -348,7 +349,7 @@ if __name__ == '__main__':
 # 		anomalies_calc_type = 'proportional'
 # 		metric = 'pct'
 # 		downscale_operation = 'mult'
-# 		ncores = '30'
+# 		ncores = '15'
 # 		# future modeled data
 # 		# # build the args
 # 		args_tuples = [ ( 'mi', modeled_fn ),
@@ -381,7 +382,7 @@ if __name__ == '__main__':
 
 # 		args = ''.join([ ' -'+flag+' '+value for flag, value in args_tuples ])
 
-# 		os.system( 'ipython -- ar5_model_data_downscaling.py ' + args )
+# 		os.system( 'ipython2.7 -- ar5_model_data_downscaling.py ' + args )
 
 # # # # # # # # # # # # # # # # # # # # 
 # # TO RUN THE TEMPERATURE DOWNSCALING USE THIS EXAMPLE:
