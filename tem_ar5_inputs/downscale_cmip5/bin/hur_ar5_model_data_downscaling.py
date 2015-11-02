@@ -3,21 +3,6 @@
 # # # # #
 # Tool to downscale the CMIP5 data from the PCMDI group. 
 # # # # #
-def cru_generator( n, cru_clim_list ):
-	'''
-	generator that will produce the cru climatologies with a
-	generator and replicate for the total number of years in n
-	'''
-	months = [ '01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12' ]
-	for i in range( n ):
-		for count, j in enumerate( cru_clim_list ):
-			yield j
-def standardized_fn_to_vars( fn ):
-	''' take a filename string following the convention for this downscaling and break into parts and return a dict'''
-	name_convention = [ 'variable', 'cmor_table', 'model', 'scenario', 'experiment', 'begin_time', 'end_time' ]
-	fn = os.path.basename( fn )
-	fn_list = fn.split( '.' )[0].split( '_' )
-	return { i:j for i,j in zip( name_convention, fn_list )}
 def shiftgrid(lon0,datain,lonsin,start=True,cyclic=360.0):
 	import numpy as np
 	"""
@@ -78,6 +63,21 @@ def shiftgrid(lon0,datain,lonsin,start=True,cyclic=360.0):
 		lonsout[i0_shift:] = lonsin[start_idx:i0+start_idx]
 	dataout[...,i0_shift:] = datain[...,start_idx:i0+start_idx]
 	return dataout,lonsout
+def cru_generator( n, cru_clim_list ):
+	'''
+	generator that will produce the cru climatologies with a
+	generator and replicate for the total number of years in n
+	'''
+	months = [ '01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12' ]
+	for i in range( n ):
+		for count, j in enumerate( cru_clim_list ):
+			yield j
+def standardized_fn_to_vars( fn ):
+	''' take a filename string following the convention for this downscaling and break into parts and return a dict'''
+	name_convention = [ 'variable', 'cmor_table', 'model', 'scenario', 'experiment', 'begin_time', 'end_time' ]
+	fn = os.path.basename( fn )
+	fn_list = fn.split( '.' )[0].split( '_' )
+	return { i:j for i,j in zip( name_convention, fn_list )}
 def downscale( src, dst, cru, src_crs, src_affine, dst_crs, dst_affine, output_filename, dst_meta, \
 		method='cubic_spline', operation='add', output_dtype='float32', **kwargs ):
 	'''
@@ -142,8 +142,6 @@ if __name__ == '__main__':
 	parser.add_argument( "-mi", "--modeled_fn", nargs='?', const=None, action='store', dest='modeled_fn', type=str, help="path to modeled input filename (NetCDF); default:None" )
 	parser.add_argument( "-hi", "--historical_fn", nargs='?', const=None, action='store', dest='historical_fn', type=str, help="path to historical input filename (NetCDF); default:None" )
 	parser.add_argument( "-o", "--output_dir", action='store', dest='output_dir', type=str, help="string path to the output folder containing the new downscaled outputs" )
-	parser.add_argument( "-bt", "--begin_time", action='store', dest='begin_time', type=str, help="string in format YYYYMM of the beginning month/year" )
-	parser.add_argument( "-et", "--end_time", action='store', dest='end_time', type=str, help="string in format YYYYMM of the ending month/year" )
 	parser.add_argument( "-cbt", "--climatology_begin_time", nargs='?', const='196101', action='store', dest='climatology_begin', type=str, help="string in format YYYYMM or YYYY of the beginning month and potentially (year) of the climatology period" )
 	parser.add_argument( "-cet", "--climatology_end_time", nargs='?', const='199012', action='store', dest='climatology_end', type=str, help="string in format YYYYMM or YYYY of the ending month and potentially (year) of the climatology period" )
 	parser.add_argument( "-plev", "--plev", nargs='?', const=None, action='store', dest='plev', type=int, help="integer value (in millibars) of the desired pressure level to extract, if there is one." )
@@ -151,6 +149,9 @@ if __name__ == '__main__':
 	parser.add_argument( "-at", "--anomalies_calc_type", nargs='?', const='absolute', action='store', dest='anomalies_calc_type', type=str, help="string of 'proportional' or 'absolute' to inform of anomalies calculation type to perform." )
 	parser.add_argument( "-m", "--metric", nargs='?', const='metric', action='store', dest='metric', type=str, help="string of whatever the metric type is of the outputs to put in the filename." )
 	parser.add_argument( "-dso", "--downscale_operation", action='store', dest='downscale_operation', type=str, help="string of 'add', 'mult', 'div', which refers to the type or downscaling operation to use." )
+	parser.add_argument( "-nc", "--ncores", nargs='?', const=2, action='store', dest='ncores', type=int, help="integer valueof number of cores to use. default:2" )
+	# parser.add_argument( "-bt", "--begin_time", action='store', dest='begin_time', type=str, help="string in format YYYYMM of the beginning month/year" )
+	# parser.add_argument( "-et", "--end_time", action='store', dest='end_time', type=str, help="string in format YYYYMM of the ending month/year" )
 
 	# parse args
 	args = parser.parse_args()
@@ -168,6 +169,7 @@ if __name__ == '__main__':
 	anomalies_calc_type = args.anomalies_calc_type
 	metric = args.metric
 	downscale_operation = args.downscale_operation
+	ncores = args.ncores
 
 	# * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 	# [NOTE]: hardwired raster metadata meeting the ALFRESCO Model's needs for 
@@ -233,7 +235,7 @@ if __name__ == '__main__':
 	if anomalies_calc_type == 'absolute':
 		anomalies = ds.groupby( 'time.month' ) - climatology
 	elif anomalies_calc_type == 'proportional':
-		anomalies = climatology / ds.groupby( 'time.month' )
+		anomalies = ds.groupby( 'time.month' ) / climatology
 	else:
 		NameError( 'anomalies_calc_type can only be one of "absolute" or "proportional"' )
 
@@ -279,7 +281,7 @@ if __name__ == '__main__':
 	del climatology, anomalies
 
 	# run in parallel using PATHOS
-	pool = mp.Pool( 4 )
+	pool = mp.Pool( processes=ncores )
 	args_list = zip( np.vsplit( dat, time_len ), output_filenames, cru_gen )
 	del dat, cru_gen, cru_stack
 
@@ -290,37 +292,47 @@ if __name__ == '__main__':
 
 
 # # # # # # # # # SOME TESTING AND EXAMPLE GENERATION AREA # # # # # # # # # 
-# some setup pathing <<-- THIS TO BE CONVERTED TO ARGUMENTS AT COMMAND LINE
-# historical_fn = '/workspace/Shared/Tech_Projects/ESGF_Data_Access/project_data/data/prepped/GFDL-CM3/hur/hur_Amon_GFDL-CM3_historical_r1i1p1_186001_200512.nc' 
-# modeled_fn = '/workspace/Shared/Tech_Projects/ESGF_Data_Access/project_data/data/prepped/GFDL-CM3/hur/hur_Amon_GFDL-CM3_rcp26_r1i1p1_200601_210012.nc' 
+# import os
+# import pandas as pd
+# import numpy as np
 
-# variable = 'hur'
-# metric = 'pct'
-# output_dir = '/home/UA/malindgren/Documents/hur/akcan/new'
-# time_begin = '2006-01' # will change for future and historical
-# time_end = '2100-12' # will change for future and historical
-# climatology_begin = '1961'
-# climatology_end = '1990'
-# plev = 1000 # this is in millibar data, this is also a None default!
-# cru_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_ts20/akcan'
-# anomalies_calc_type = 'proportional'
+# # change to the script repo
+# os.chdir( '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/CODE/tem_ar5_inputs/downscale_cmip5/bin' )
+
+# # to run the futures:
+# prepped_dir = '/workspace/Shared/Tech_Projects/ESGF_Data_Access/project_data/data/prepped'
+# file_groups = [ [os.path.join(root,f) for f in files] for root, sub, files in os.walk( prepped_dir ) if len(files) > 0 and files[0].endswith('.nc') and 'hur' in files[0] ]
+
+# def make_rcp_file_pairs( file_group ):
+# 	# there is only one historical per group since these have been pre-processed to a single file and date range
+# 	historical = [ file_group.pop( count ) for count, i in enumerate( file_group ) if 'historical' in i ]
+# 	return zip( np.repeat( historical, len(file_group) ).tolist(), file_group )
+
+# grouped_pairs = [ make_rcp_file_pairs( file_group ) for file_group in file_groups ]
 
 
-# unpack args
-# modeled_fn = '/workspace/Shared/Tech_Projects/ESGF_Data_Access/project_data/data/prepped/GFDL-CM3/hur/hur_Amon_GFDL-CM3_rcp26_r1i1p1_200601_210012.nc'
-# historical_fn = '/workspace/Shared/Tech_Projects/ESGF_Data_Access/project_data/data/prepped/GFDL-CM3/hur/hur_Amon_GFDL-CM3_historical_r1i1p1_186001_200512.nc'
-# output_dir = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/downscaled'
-# begin_time = '1860-01'
-# end_time = '2005-12'
+# output_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_november_final'
 # climatology_begin = '1961-01'
 # climatology_end = '1990-12'
-# plev = 1000
-# cru_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_ts20/akcan/hur'
+# cru_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_november_final/cru_cl20/cld/akcan'
 # anomalies_calc_type = 'proportional'
-# metric = 'mean'
+# metric = 'pct'
 # downscale_operation = 'mult'
+# ncores = '10'
+# # future modeled data
+# # # build the args
+# args_tuples = [ ( 'mi', modeled_fn ),
+# 				( 'hi', historical_fn ),
+# 				( 'o', output_path ),
+# 				( 'cbt', climatology_begin ),
+# 				( 'cet', climatology_end ),
+# 				( 'plev', 1000 )
+# 				( 'cru', cru_path ),
+# 				( 'at', anomalies_calc_type ),
+# 				( 'm', metric ),
+# 				( 'dso', downscale_operation ),
+# 				( 'nc', ncores ) ]
 
-# test = map( run, [{'src':src, 'output_filename':fn, 'dst':dst, 'cru':cru, 'src_crs':meta_4326[ 'crs' ], 'src_affine':meta_4326[ 'affine' ], \
-# 							'dst_crs':meta_3338[ 'crs' ], 'dst_affine':meta_3338[ 'affine' ], 'dst_meta':meta_3338, 'operation':downscale_operation } \
-# 							for src,fn,cru in zip( np.vsplit( dat, time_len ), output_filenames, cru_gen )[:1]] )
+
+
 
