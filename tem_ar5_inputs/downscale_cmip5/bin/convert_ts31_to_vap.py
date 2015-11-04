@@ -43,13 +43,12 @@ if __name__ == '__main__':
 	from pathos import multiprocessing as mp
 
 	# read in the args
-	tas_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_october_final/cru_ts31/tas/downscaled'
-	hur_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_october_final/cru_ts31/hur/downscaled'
+	tas_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_ts323/tas/downscaled'
+	hur_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_ts323/hur/downscaled'
 	tas_list = sorted( glob.glob( os.path.join( tas_path, 'tas*.tif' ) ) )
 	hur_list = sorted( glob.glob( os.path.join( hur_path, 'hur*.tif' ) ) )
 
-	# out = map( run, zip( tas_list, hur_list ) )
-
+	# run in parallel
 	pool = mp.Pool( 12 )
 	out = pool.map( run, zip( tas_list, hur_list ) )
 	pool.close()
