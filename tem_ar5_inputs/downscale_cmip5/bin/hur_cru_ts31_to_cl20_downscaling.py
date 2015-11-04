@@ -154,39 +154,6 @@ def xyz_to_grid( x, y, z, grid, method='cubic', output_dtype=np.float32 ):
 	zi = griddata( (x, y), z, grid, method=method )
 	zi = np.flipud( zi.astype( output_dtype ) )
 	return zi
-# def run( df, meshgrid_tuple, lons_pcll, template_raster_fn, src_transform, src_crs, src_nodata, output_filename ):
-# 	'''
-# 	run the interpolation to a grid, and reprojection / resampling to the Alaska / Canada rasters
-# 	extent, resolution, origin (template_raster).
-
-# 	This function is intended to be used to run a pathos.multiprocessing Pool's map function
-# 	across a list of pre-computed arguments.
-			
-# 	RETURNS:
-
-# 	[str] path to the output filename generated
-
-# 	'''
-# 	template_raster = rasterio.open( template_raster_fn )
-# 	interp_arr = xyz_to_grid( np.array(df['lon'].tolist()), \
-# 					np.array(df['lat'].tolist()), \
-# 					np.array(df['anom'].tolist()), grid=meshgrid_tuple, method='cubic' ) 
-
-# 	src_nodata = -9999.0 # nodata
-# 	interp_arr[ np.isnan( interp_arr ) ] = src_nodata
-# 	dat, lons = shiftgrid( 180., interp_arr, lons_pcll, start=False )
-# 	output_arr = np.empty_like( template_raster.read( 1 ) )
-# 	# mask it with the internal mask in the template raster, where 0 is oob.
-# 	output_arr = np.ma.masked_where( template_raster.read_masks( 1 ) == 0, output_arr )
-# 	template_meta = template_raster.meta
-
-# 	if 'transform' in template_meta.keys():
-# 		template_meta.pop( 'transform' )
-
-# 	reproject( dat, output_arr, src_transform=src_transform, src_crs=src_crs, src_nodata=src_nodata, \
-# 				dst_transform=template_meta['affine'], dst_crs=template_meta['crs'],\
-# 				dst_nodata=None, resampling=RESAMPLING.nearest, num_threads=1, SOURCE_EXTRA=1000 )
-# 	return write_gtiff( output_arr, template_meta, output_filename, compress=True )
 def generate_anomalies( df, meshgrid_tuple, lons_pcll, template_raster_fn, src_transform, src_crs, src_nodata, output_filename, *args, **kwargs ):
 	'''
 	run the interpolation to a grid, and reprojection / resampling to the Alaska / Canada rasters
@@ -236,52 +203,6 @@ def convert_to_vap( tas_arr, hur_arr ):
 	esa_arr = 6.112 * np.exp( 17.62 * tas_arr/ (243.12 + tas_arr) )
 	# esa_arr = 6.112 * np.exp( 22.46 * tas_arr / (272.62 + tas_arr) )
 	return (hur_arr*esa_arr)/100
-# def downscale_cru_historical( file_list, cru_cl20_arr, output_path, downscaling_operation ):
-# 	'''
-# 	take a list of cru_historical anomalies filenames, groupby month, 
-# 	then downscale with the cru_cl20 climatology as a numpy 2d ndarray
-# 	that is also on the same grid as the anomalies files.  
-# 	(intended to be the akcan 1km/2km extent).
-
-# 	operation can be one of 'mult', 'add', 'div' and represents the 
-# 	downscaling operation to be use to scale the anomalies on top of the baseline.
-# 	this is based on how the anomalies were initially calculated.
-
-# 	RETURNS:
-
-# 	output path location of the new downscaled files.
-# 	'''
-# 	from functools import partial
-	
-# 	def f( anomaly_fn, baseline_arr, output_path ):
-# 		def add( cru, anom ):
-# 			return cru + anom
-# 		def mult( cru, anom ):
-# 			return cru * anom
-# 		def div( cru, anom ):
-# 			# return cru / anom
-# 			# this one may not be useful, but the placeholder is here 
-# 			return NotImplementedError
-
-# 		cru_ts31 = rasterio.open( anomaly_fn )
-# 		meta = cru_ts31.meta
-# 		meta.update( compress='lzw' )
-# 		cru_ts31 = cru_ts31.read( 1 )
-# 		operation_switch = { 'add':add, 'mult':mult, 'div':div }
-# 		downscaled = operation_switch[ downscaling_operation ]( baseline_arr, cru_ts31 )
-# 		# this is hardwired stuff for this fairly hardwired script.
-# 		output_filename = os.path.basename( anomaly_fn ).replace( 'anom', 'downscaled' )
-# 		output_filename = os.path.join( output_path, output_filename )
-# 		output_arr = baseline_arr * cru_ts31 # multiply since it was relative anomalies
-# 		if 'transform' in meta.keys():
-# 			meta.pop( 'transform' )
-# 		with rasterio.open( output_filename, 'w', **meta ) as out:
-# 			out.write( output_arr, 1 )
-# 		return output_filename
-		
-# 	partial_f = partial( f, baseline_arr=cru_cl20_arr, output_path=output_path )
-# 	cru_ts31 = file_list.apply( lambda fn: partial_f( anomaly_fn=fn ) )
-# 	return output_path
 def downscale_cru_historical( file_list, cru_cl20_arr, output_path, downscaling_operation ):
 	'''
 	take a list of cru_historical anomalies filenames, groupby month,
@@ -508,6 +429,35 @@ if __name__ == '__main__':
 # climatology_end = '1990'
 # year_begin = '1901'
 # year_end = '2009'
+# variable = 'hur'
+# metric = 'pct'
+
+# args_tuples = [ ('hhi', cru_ts31_vap), ('thi', cru_ts31_tas), ('ci', cl20_path), ('tr', template_raster_fn), 
+# 				('base', base_path), ('bt', year_begin), ('et', year_end), 
+# 				('cbt', climatology_begin), ('cet', climatology_end), 
+# 				('nc', ncores), ('at', anomalies_calc_type), ('m', metric), 
+# 				('dso', downscaling_operation), ('v', variable) ]
+
+# args = ''.join([ ' -'+flag+' '+value for flag, value in args_tuples ])
+# os.system( 'ipython2.7 -i -- hur_cru_ts31_to_cl20_downscaling.py ' + args )
+
+
+# # # CRU TS 3.2.3 example run -- test for working with more up-to-date files # # # 
+# import os
+# os.chdir( '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/CODE/tem_ar5_inputs/downscale_cmip5/bin' )
+# ncores = '10'
+# base_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_ts323'
+# cru_ts31_vap = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_ts323/cru_ts3.23.1901.2014.vap.dat.nc'
+# cru_ts31_tas = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_ts323/cru_ts3.23.1901.2014.tmp.dat.nc'
+# cl20_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_october_final/cru_cl20/hur/akcan' # hur 
+# template_raster_fn = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/templates/tas_mean_C_AR5_GFDL-CM3_historical_01_1860.tif'
+# anomalies_calc_type = 'relative' # 'absolute'
+# downscaling_operation = 'mult' # 'add'
+
+# climatology_begin = '1961'
+# climatology_end = '1990'
+# year_begin = '1901'
+# year_end = '2014'
 # variable = 'hur'
 # metric = 'pct'
 
