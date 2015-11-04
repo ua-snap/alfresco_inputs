@@ -1,6 +1,6 @@
-def resample_to_1km( x, template_raster_obj ):
+def resample_to_1km( x, template_raster_mask ):
 	'''
-	template_raster_obj should be a mask in in the res/extent/origin/crs of the 
+	template_raster_mask should be a mask in in the res/extent/origin/crs of the 
 	existing TEM IEM products.
 	'''
 	import rasterio, os
@@ -29,53 +29,78 @@ def resample_to_1km( x, template_raster_obj ):
 
 	output_filename = os.path.join( output_path, fn_switch[ fn_dict[ 'variable' ] ] )
 
-	template_arr = template_raster_obj.read( 1 )
-	template_meta = template_raster_obj.meta
-	template_meta.update( compress='lzw' )
-	
 	rst = rasterio.open( x )
-	# window = rst.window( *template_raster_obj.bounds )
-	# window_transform = rst.window_transform( window )
-	rst_arr = rst.read( 1 ) # window=window )
+	rst_arr = rst.read( 1 )
+
+	template_arr = template_raster_mask.read( 1 )
+	template_meta = template_raster_mask.meta
+	template_meta.update( compress='lzw', nodata=rst.nodata )
 	
 	if 'transform' in template_meta.keys():
 		template_meta.pop( 'transform' )
 
-	output_arr = np.empty_like( template_arr )
-
-	mask = template_raster_obj.read_mask( 1 )
-	mask[ mask != 0] = 1
-	meta = template_raster_obj.meta
-	meta.update( compress='lzw', dtype=np.uint8, nodata=0 )
-	meta.pop( 'transform' )
+	output_arr = np.empty_like( template_arr.astype( np.float32 ) )
+	output_arr[ template_arr == 0 ] = rst.nodata
 
 	src_crs = {'init':'epsg:3338'}
 	dst_crs = {'init':'epsg:3338'}
-	reproject( rst_arr, output_arr, src_transform=rst.affine, src_crs=rst.crs, src_nodata=rst.nodata, \
-			dst_transform=template_meta['affine'], dst_crs=template_meta['crs'],\
-			dst_nodata=None, resampling=RESAMPLING.cubic_spline, num_threads=1 )
+
+	reproject( rst_arr, output_arr, src_transform=rst.affine, src_crs=src_crs, src_nodata=rst.nodata, \
+			dst_transform=template_raster_mask.affine, dst_crs=dst_crs,\
+			dst_nodata=rst.nodata, resampling=RESAMPLING.cubic_spline, num_threads=2 )
 
 	with rasterio.open( output_filename, 'w', **template_meta ) as out:
-		output_arr[ mask == 0 ] = template_raster_obj.nodata
+		output_arr[ template_arr == 0 ] = rst.nodata
 		out.write( output_arr, 1 )
 	return output_filename
 
 
 if __name__ == '__main__':
+	import os, glob, rasterio
+	import numpy as np
+	import pandas as pd
+	from functools import partial
+	from pathos import multiprocessing as mp
+
 	# some setup:
-	template_raster_fn = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/extents/vap_mean_hPa_iem_cccma_cgcm3_1_sresa1b_01_2001.tif'
-	template_raster_obj = rasterio.open( template_raster_fn )
-	resample_to_1km( x, template_raster_obj )
+	input_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_october_final/cru_ts31'
+	template_raster_mask_fn = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/extents/IEM_Mask_1km.tif'
+	
+	# list the data we are going to get IEM-ready
+	l = glob.glob( os.path.join( input_path, '*.tif' ) )
+	
+	for root, subs, files in os.walk( input_path ):
+		if len(files) > 0 and 'downscaled' in files[0]:
+			# read in the template raster mask must be 0-nodata, 1-data
+			template_raster_mask = rasterio.open( template_raster_mask_fn )
+
+			resample_to_1km_partial = partial( resample_to_1km, template_raster_mask=template_raster_mask )
+
+			# add back in the file paths from the root
+			files = [ os.path.join( root, i ) for i in files ]
+
+			# run it in parallel
+			pool = mp.Pool( processes=12 )
+			pool.map( lambda x: resample_to_1km_partial( x=x ), files )
+			pool.close()
 
 
-	with rasterio.open( '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/extents/iem_mask_1km.tif', 'w', **meta ) as out:
-		out.write( mask.astype(np.uint8), 1 )
 
-	x = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_october_final/cru_ts31_old/cld/downscaled/cld_pct_cru_ts31_downscaled_03_2001.tif'
-	# x = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_october_final/ar5/IPSL-CM5A-LR/cld/downscaled/cld_metric_IPSL-CM5A-LR_rcp85_r1i1p1_12_2087.tif'
+# # # # MAKE A MASK TO USE AS THE TEMPLATE RASTER
+# template_fn = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/extents/tas_mean_C_iem_cru_TS31_01_1901.tif'
+# template = rasterio.open( template_fn )
+# template_meta = template.meta
+# template_mask = template.read_masks( 1 )
+# template_arr = template.read( 1 )
+# template_arr[ template_mask != 0 ] = 1
+# template_arr[ template_mask == 0 ] = 0
 
+# template_meta.update( compress='lzw', crs={'init':'epsg:3338'} )
+# output_filename = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/extents/IEM_Mask_1km.tif'
+# with rasterio.open( output_filename, 'w', **template_meta ) as out:
+# 	out.write( template_arr, 1 )
 
-
+# # # # # 
 # def standardized_fn_to_vars( fn ):
 # 	''' take a filename string following the convention for this downscaling and break into parts and return a dict'''
 # 	fn = os.path.basename( fn )
