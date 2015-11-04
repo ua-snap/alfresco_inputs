@@ -41,3 +41,26 @@ if __name__ == '__main__':
 
 
 
+	# # # OLD R CODE THAT WE USED FROM DAVE MC GUIRE
+	# now we calculate the nirr from the girr and the cloudcover percent using the code from Dave McGuire
+	##############################################################################################################
+	#		** this is the c++ version given by Dave.  I am using R to calculate it here
+	#		if (clds > -0.1) {
+	#			nirr = cld.subset.v * (0.251 + (0.509*(1.0 - clds/100.0))) # basically percent cloudcover
+	#			}else { 
+	#				nirr = -999.9; }
+	##############################################################################################################
+
+	output.v <- getValues(downscaled.interp.r)
+	
+	#ind <- which(values(downscaled.interp.r) > -0.1)
+	oob <- which(values(downscaled.interp.r) <= -0.1)
+	
+	if(length(oob)>0){
+		nirr = rad.monthly.current * (0.251 + (0.509 * (1.0 - downscaled.interp.r/100)))
+		values(nirr)[oob] <- -9999
+	}else{
+		nirr = rad.monthly.current * (0.251 + (0.509 * (1.0 - downscaled.interp.r/100)))
+	}
+
+

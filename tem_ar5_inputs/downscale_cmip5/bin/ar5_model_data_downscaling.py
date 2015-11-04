@@ -342,16 +342,16 @@ if __name__ == '__main__':
 # for file_group in grouped_pairs:
 # 	for historical_fn, modeled_fn in file_group:
 # 		print( 'running: %s' % os.path.basename( modeled_fn ) )
-# 		output_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_november_final'
+# 		output_path = '/Data/malindgren/cru_november_final'
 # 		climatology_begin = '1961-01'
 # 		climatology_end = '1990-12'
 # 		cru_path = os.path.join( '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_november_final/cru_cl20', variable, 'akcan' )
 # 		anomalies_calc_type = 'proportional'
 # 		metric = 'pct'
 # 		downscale_operation = 'mult'
-# 		ncores = '15'
+# 		ncores = '32'
 # 		# future modeled data
-# 		# # build the args
+# 		# build the args
 # 		args_tuples = [ ( 'mi', modeled_fn ),
 # 						( 'hi', historical_fn ),
 # 						( 'o', output_path ),
@@ -368,21 +368,23 @@ if __name__ == '__main__':
 
 # 		del modeled_fn
 
-# 		# now historical modeled data
-# 		# # build the args
-# 		args_tuples = [	( 'hi', historical_fn ),
-# 						( 'o', output_path ),
-# 						( 'cbt', climatology_begin ),
-# 						( 'cet', climatology_end ),
-# 						( 'cru', cru_path ),
-# 						( 'at', anomalies_calc_type ),
-# 						( 'm', metric ),
-# 						( 'dso', downscale_operation ),
-# 						( 'nc', ncores ) ]
+# 	# now historical modeled data
+# 	# build the args
+# 	print( 'running: %s' % os.path.basename( historical_fn ) )
 
-# 		args = ''.join([ ' -'+flag+' '+value for flag, value in args_tuples ])
+# 	args_tuples = [	( 'hi', historical_fn ),
+# 					( 'o', output_path ),
+# 					( 'cbt', climatology_begin ),
+# 					( 'cet', climatology_end ),
+# 					( 'cru', cru_path ),
+# 					( 'at', anomalies_calc_type ),
+# 					( 'm', metric ),
+# 					( 'dso', downscale_operation ),
+# 					( 'nc', ncores ) ]
 
-# 		os.system( 'ipython2.7 -- ar5_model_data_downscaling.py ' + args )
+# 	args = ''.join([ ' -'+flag+' '+value for flag, value in args_tuples ])
+
+# 	os.system( 'ipython -- ar5_model_data_downscaling.py ' + args )
 
 # # # # # # # # # # # # # # # # # # # # 
 # # TO RUN THE TEMPERATURE DOWNSCALING USE THIS EXAMPLE:
@@ -433,14 +435,14 @@ if __name__ == '__main__':
 
 # 		os.system( 'python clt_ar5_model_data_downscaling.py ' + args )
 
-# 		del modeled_fn
+#		del modeled_fn
 
-# 		# now historical modeled data
-# 		# # build the args by pop(-ping) out the first entry which is modeled_fn
-# 		args_tuples.pop(0)
-# 		args = ''.join([ ' -'+flag+' '+value for flag, value in args_tuples ])
+# 	# now historical modeled data
+# 	# # build the args by pop(-ping) out the first entry which is modeled_fn
+# 	args_tuples.pop(0)
+# 	args = ''.join([ ' -'+flag+' '+value for flag, value in args_tuples ])
 
-# 		os.system( 'ipython -- ar5_model_data_downscaling.py ' + args )
+# 	os.system( 'ipython -- ar5_model_data_downscaling.py ' + args )
 
 # # # # # # # # # # # # # # # # # # # # 
 # # TO RUN THE RELATIVE HUMIDITY DOWNSCALING USE THIS EXAMPLE:
@@ -467,17 +469,17 @@ if __name__ == '__main__':
 # for file_group in grouped_pairs:
 # 	for historical_fn, modeled_fn in file_group:
 # 		print( 'running: %s' % os.path.basename( modeled_fn ) )
-# 		output_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_november_final'
-# 		plev = '1000' # held as str due to arg passing with argparse
+# 		output_path = '/Data/malindgren/cru_november_final'
+# 		plev = '1000'
 # 		climatology_begin = '1961-01'
 # 		climatology_end = '1990-12'
 # 		cru_path = os.path.join( '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_november_final/cru_cl20',variable,'akcan' )
 # 		anomalies_calc_type = 'proportional'
 # 		metric = 'pct'
 # 		downscale_operation = 'mult'
-# 		ncores = '30'
+# 		ncores = '32'
 # 		# future modeled data
-# 		# # build the args
+
 # 		args_tuples = [ ( 'mi', modeled_fn ),
 # 						( 'hi', historical_fn ),
 # 						( 'o', output_path ),
@@ -495,10 +497,9 @@ if __name__ == '__main__':
 
 # 		del modeled_fn
 
-# 		# now historical modeled data
-# 		# # build the args by pop(-ping) out the first entry which is modeled_fn
-# 		args_tuples.pop(0)
-# 		args = ''.join([ ' -'+flag+' '+value for flag, value in args_tuples ])
+# 	# now historical modeled data
+# 	# # build the args by pop(-ping) out the first entry which is modeled_fn
+# 	args_tuples.pop(0)
+# 	args = ''.join([ ' -'+flag+' '+value for flag, value in args_tuples ])
 
-# 		os.system( 'ipython -- ar5_model_data_downscaling.py ' + args )
-
+# 	os.system( 'ipython -- ar5_model_data_downscaling.py ' + args )

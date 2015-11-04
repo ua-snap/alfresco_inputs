@@ -280,11 +280,12 @@ if __name__ == '__main__':
 # import os
 # os.chdir( '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/CODE/tem_ar5_inputs/downscale_cmip5/bin' )
 # cru_folder = '/Data/Base_Data/Climate/World/CRU_grids/CRU_TS20'
-# var_fn_dict = { 'hur':os.path.join( cru_folder, 'grid_10min_reh.dat.gz'),'tas':os.path.join( cru_folder, 'grid_10min_tmp.dat.gz'), 'sunp':os.path.join( cru_folder, 'grid_10min_sunp.dat.gz' ) }
+# # var_fn_dict = { 'hur':os.path.join( cru_folder, 'grid_10min_reh.dat.gz'),'tas':os.path.join( cru_folder, 'grid_10min_tmp.dat.gz'), 'sunp':os.path.join( cru_folder, 'grid_10min_sunp.dat.gz' ) }
+# var_fn_dict = { 'pre':os.path.join( cru_folder, 'grid_10min_pre.dat.gz' ) } # just a test.
 # base_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_october_final'
 # template_raster_fn = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/templates/tas_mean_C_AR5_GFDL-CM3_historical_01_1860.tif'
 
 # for variable, cru_filename in var_fn_dict.iteritems():
 # 	print 'working on : %s' % variable
-# 	os.system( 'ipython cru_cl20_1961_1990_climatology_preprocess.py -- -p ' + base_path + ' -cru ' + cru_filename + ' -v ' + variable + ' -tr ' + template_raster_fn )
+# 	os.system( 'ipython -- cru_cl20_1961_1990_climatology_preprocess.py -p ' + base_path + ' -cru ' + cru_filename + ' -v ' + variable + ' -tr ' + template_raster_fn )
 

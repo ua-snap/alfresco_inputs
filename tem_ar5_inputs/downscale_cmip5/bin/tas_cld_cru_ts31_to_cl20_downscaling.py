@@ -359,7 +359,7 @@ if __name__ == '__main__':
 	years = np.arange( int(year_begin), int(year_end)+1, 1 ).astype( str ).tolist()
 	months = [ i if len(i)==2 else '0'+i for i in np.arange( 1, 12+1, 1 ).astype( str ).tolist() ]
 	month_year = [ (month, year) for year in years for month in months ]
-	output_filenames = [ os.path.join( anomalies_path, '_'.join([ variable,metric,'cru_ts31_anom',month,year])+'.tif' ) 
+	output_filenames = [ os.path.join( anomalies_path, '_'.join([ variable,metric,'cru_ts323_anom',month,year])+'.tif' ) 
 							for month, year in month_year ]
 
 	# build a list of keyword args to pass to the pool of workers.
@@ -448,4 +448,60 @@ if __name__ == '__main__':
 
 # args = ''.join([ ' -'+flag+' '+value for flag, value in args_tuples ])
 # os.system( 'ipython2.7 -- tas_cld_cru_ts31_to_cl20_downscaling.py ' + args )
+
+
+# # # CRU TS 3.23 -- update:
+# import os
+# os.chdir( '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/CODE/tem_ar5_inputs/downscale_cmip5/bin' )
+# ncores = '10'
+# base_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_ts323'
+# cru_ts31 = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_ts323/cru_ts3.23.1901.2014.cld.dat.nc' # 'cru_ts_3_10.1901.2009.tmp.nc'
+# cl20_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_october_final/cru_cl20/cld/akcan'
+# template_raster_fn = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/templates/tas_mean_C_AR5_GFDL-CM3_historical_01_1860.tif'
+# anomalies_calc_type = 'relative' # 'absolute'
+# downscaling_operation = 'mult' # 'add'
+
+# climatology_begin = '1961'
+# climatology_end = '1990'
+# year_begin = '1901'
+# year_end = '2014'
+# variable = 'cld' # 'tas'
+# metric = 'pct' # 'C'
+
+# args_tuples = [ ('hi', cru_ts31), ('ci', cl20_path), ('tr', template_raster_fn), 
+# 				('base', base_path), ('bt', year_begin), ('et', year_end),
+# 				('cbt', climatology_begin), ('cet', climatology_end),
+# 				('nc', ncores), ('at', anomalies_calc_type), ('m', metric), 
+# 				('dso', downscaling_operation), ('v', variable) ]
+
+# args = ''.join([ ' -'+flag+' '+value for flag, value in args_tuples ])
+# os.system( 'ipython2.7 -- tas_cld_cru_ts31_to_cl20_downscaling.py ' + args )
+
+# # TAS 
+# import os
+# os.chdir( '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/CODE/tem_ar5_inputs/downscale_cmip5/bin' )
+# ncores = '10'
+# base_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_ts323'
+# cru_ts31 = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_ts323/cru_ts3.23.1901.2014.tmp.dat.nc'
+# cl20_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_october_final/cru_cl20/cld/akcan'
+# template_raster_fn = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/templates/tas_mean_C_AR5_GFDL-CM3_historical_01_1860.tif'
+# anomalies_calc_type = 'absolute'
+# downscaling_operation = 'add'
+
+# climatology_begin = '1961'
+# climatology_end = '1990'
+# year_begin = '1901'
+# year_end = '2014'
+# variable = tas'
+# metric = 'C'
+
+# args_tuples = [ ('hi', cru_ts31), ('ci', cl20_path), ('tr', template_raster_fn), 
+# 				('base', base_path), ('bt', year_begin), ('et', year_end),
+# 				('cbt', climatology_begin), ('cet', climatology_end),
+# 				('nc', ncores), ('at', anomalies_calc_type), ('m', metric), 
+# 				('dso', downscaling_operation), ('v', variable) ]
+
+# args = ''.join([ ' -'+flag+' '+value for flag, value in args_tuples ])
+# os.system( 'ipython2.7 -- tas_cld_cru_ts31_to_cl20_downscaling.py ' + args )
+
 
