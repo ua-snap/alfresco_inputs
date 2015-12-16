@@ -19,8 +19,11 @@ def resample_to_1km( x, template_raster_mask ):
 		fn_parts = ['variable', 'metric', 'model', 'scenario', 'ensemble', 'month', 'year']
 		fn_dict = dict( zip( fn_parts, fn_split ) )
 
-	if not os.path.exists( output_path ):
-		os.makedirs( output_path )
+	try:
+		if not os.path.exists( output_path ):
+			os.makedirs( output_path )
+	except:
+		pass
 
 	fn_switch = { 'cld':'_'.join([ 'cld','mean','pct','iem',fn_dict['model'],fn_dict['scenario'],fn_dict['month'], fn_dict['year'] ]) + '.tif',
 		'vap':'_'.join(['vap','mean','hPa','iem', fn_dict['model'],fn_dict['scenario'],fn_dict['month'], fn_dict['year'] ]) + '.tif', 
@@ -63,26 +66,46 @@ if __name__ == '__main__':
 	from pathos import multiprocessing as mp
 
 	# some setup:
-	input_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_october_final/cru_ts31'
+	input_path = '/Data/malindgren/cru_november_final/ar5' # '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_november_final/ar5'
 	template_raster_mask_fn = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/extents/IEM_Mask_1km.tif'
+	ncores = 20
+
+	# read in the template raster mask must be 0-nodata, 1-data
+	template_raster_mask = rasterio.open( template_raster_mask_fn )
+	resample_to_1km_partial = partial( resample_to_1km, template_raster_mask=template_raster_mask )
 	
-	# list the data we are going to get IEM-ready
-	l = glob.glob( os.path.join( input_path, '*.tif' ) )
-	
-	for root, subs, files in os.walk( input_path ):
-		if len(files) > 0 and 'downscaled' in files[0]:
-			# read in the template raster mask must be 0-nodata, 1-data
-			template_raster_mask = rasterio.open( template_raster_mask_fn )
+	models = [ 'IPSL-CM5A-LR', 'GISS-E2-R', 'MRI-CGCM3', 'CCSM4', 'GFDL-CM3' ]
+	variables = ['cld', 'vap' ] # ['tas'] # ['hur'] # run the HUR after the cld/vap which is required for TEM
+	# tas_files = sorted( glob.glob( os.path.join( tas_input_path, model, 'tas', 'downscaled', '*.tif' ) ) )
 
-			resample_to_1km_partial = partial( resample_to_1km, template_raster_mask=template_raster_mask )
+	path_list = [ os.path.join( input_path, model, variable, 'downscaled', '*.tif' ) for model in models for variable in variables ]
 
-			# add back in the file paths from the root
-			files = [ os.path.join( root, i ) for i in files ]
+	# temporary for failes EOS run:
+	complete = '/Data/malindgren/cru_november_final/ar5/IPSL-CM5A-LR/cld/downscaled/*.tif'
+	path_list = [ path for path in path_list if path != complete ]
+	# end temporary
 
-			# run it in parallel
-			pool = mp.Pool( processes=12 )
-			pool.map( lambda x: resample_to_1km_partial( x=x ), files )
-			pool.close()
+	for path in path_list:
+		print path 
+		files = glob.glob( path )
+
+		# run it in parallel
+		pool = mp.Pool( processes=ncores )
+		pool.map( lambda x: resample_to_1km_partial( x=x ), files )
+		pool.close()
+
+
+
+	# for root, subs, files in os.walk( input_path ):
+	# 	if root.endswith( 'downscaled' ):
+	# 		print 'running: %s' % root
+	# 		# add back in the file paths from the root
+	# 		files = [ os.path.join( root, i ) for i in files ]
+
+	# 		# run it in parallel
+	# 		pool = mp.Pool( processes=ncores )
+	# 		pool.map( lambda x: resample_to_1km_partial( x=x ), files )
+	# 		pool.close()
 
 
 

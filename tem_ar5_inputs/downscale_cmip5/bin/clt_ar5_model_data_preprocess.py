@@ -259,6 +259,7 @@ if __name__ == '__main__':
 
 	problem_files_log.close()
 
+
 # EXAMPLE OF USE:
 # some setup
 # import os
@@ -275,7 +276,7 @@ if __name__ == '__main__':
 # --> special clt prep due to ESGF being down for the past months.
 # import os
 # models = [ 'GISS-E2-R', 'IPSL-CM5A-LR', 'MRI-CGCM3', 'CCSM4', 'GFDL-CM3' ]
-# variables = [ 'clt']
+# variables = [ 'clt' ]
 # base_path = '/workspace/Shared/Tech_Projects/ESGF_Data_Access/project_data/data/cmip5_clt_nonstandard'
 # os.chdir( '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/CODE/tem_ar5_inputs/downscale_cmip5/bin' )
 # for model in models:
