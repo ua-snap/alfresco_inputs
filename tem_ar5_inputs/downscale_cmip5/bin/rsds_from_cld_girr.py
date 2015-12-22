@@ -50,24 +50,39 @@ if __name__ == '__main__':
 	# data dict for passing around in parallel
 	girr = dict(zip( months,  girr ))
 
+	# # list the cloud files for a series
+	# input_path = '/Data/malindgren/cru_november_final/IEM/clouds/ar5'
+	# 	# THERE IS AN ISSUE WITH THE IPSL...
+	# models = [ 'MRI-CGCM3' ] # [ 'IPSL-CM5A-LR', 'GISS-E2-R' ] #[ 'MRI-CGCM3', 'CCSM4', 'GFDL-CM3' ] 
+	# variables = [ 'cld' ] # we are only using clouds here
+	# experiments = ['rcp26'] # [ 'historical', 'rcp26', 'rcp45', 'rcp60', 'rcp85' ]
+	# path_list = [ os.path.join( input_path, model, variable, 'downscaled', experiment, '*.tif' ) for model in models for variable in variables for experiment in experiments ]
+
+	# for path in path_list:
+	# 	print( 'running: %s ' % path )
+	# 	# path='/Data/malindgren/cru_november_final/IEM/ar5/MRI-CGCM3/cld/downscaled/*rcp26*.tif'
+	# 	cld = pd.Series( glob.glob( path ) )
+	# 	print( 'file count: %d' % len( cld ) )
+
+	# 	output_filenames = cld.apply( lambda x: x.replace('cld', 'rsds').replace( '_pct_', '_MJ-m2-d1_' ) ).tolist()
+	# 	month_grouper = cld.apply( lambda x: os.path.basename( x ).split( '.' )[0].split( '_' )[-2] )
+	# 	args_list = [ ( cld, girr[ month ], out ) for cld, out, month in zip( cld.tolist(), output_filenames, month_grouper ) ]
+
+	# 	# run it in parallel
+	# 	out = mp_map( lambda x: generate_nirr( *x ), args_list, nproc=ncores )
+
+
+	# # # CRU TS 3.23 Historical DATA VERSION
 	# list the cloud files for a series
-	input_path = '/Data/malindgren/cru_november_final/IEM/clouds/ar5'
-		# THERE IS AN ISSUE WITH THE IPSL...
-	models = [ 'MRI-CGCM3' ] # [ 'IPSL-CM5A-LR', 'GISS-E2-R' ] #[ 'MRI-CGCM3', 'CCSM4', 'GFDL-CM3' ] 
-	variables = [ 'cld' ] # we are only using clouds here
-	experiments = ['rcp26'] # [ 'historical', 'rcp26', 'rcp45', 'rcp60', 'rcp85' ]
-	path_list = [ os.path.join( input_path, model, variable, 'downscaled', experiment, '*.tif' ) for model in models for variable in variables for experiment in experiments ]
+	path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_october_final/IEM/cru_ts31/cld/downscaled/*.tif'
+	print( 'running: %s ' % path )
+	cld = pd.Series( glob.glob( path ) )
+	print( 'file count: %d' % len( cld ) )
 
-	for path in path_list:
-		print( 'running: %s ' % path )
-		# path='/Data/malindgren/cru_november_final/IEM/ar5/MRI-CGCM3/cld/downscaled/*rcp26*.tif'
-		cld = pd.Series( glob.glob( path ) )
-		print( 'file count: %d' % len( cld ) )
+	output_filenames = cld.apply( lambda x: x.replace('cld', 'rsds').replace( '_pct_', '_MJ-m2-d1_' ) ).tolist()
+	month_grouper = cld.apply( lambda x: os.path.basename( x ).split( '.' )[0].split( '_' )[-2] )
+	args_list = [ ( cld, girr[ month ], out ) for cld, out, month in zip( cld.tolist(), output_filenames, month_grouper ) ]
 
-		output_filenames = cld.apply( lambda x: x.replace('cld', 'rsds').replace( '_pct_', '_MJ-m2-d1_' ) ).tolist()
-		month_grouper = cld.apply( lambda x: os.path.basename( x ).split( '.' )[0].split( '_' )[-2] )
-		args_list = [ ( cld, girr[ month ], out ) for cld, out, month in zip( cld.tolist(), output_filenames, month_grouper ) ]
-
-		# run it in parallel
-		out = mp_map( lambda x: generate_nirr( *x ), args_list, nproc=ncores )
+	# run it in parallel
+	out = mp_map( lambda x: generate_nirr( *x ), args_list, nproc=ncores )
 
