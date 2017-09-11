@@ -1,9 +1,15 @@
-# # # # #
-# Tool to downscale the CMIP5 data from the PCMDI group. 
-# # # # #
-import rasterio, xray, os, glob
+# # #
+# Downscale CRU Historical TS3.x data to a pre-processed climatology
+#  extent, resolution, reference system
+#
+# Author: Michael Lindgren (malindgren@alaska.edu)
+# # #
+
+# import some modules
+import rasterio, xray, os
 import numpy as np
 import pandas as pd
+import numpy as np
 
 class DownscalingUtils( object ):
 	def write_gtiff( self, output_arr, template_meta, output_filename, compress=True ):
@@ -28,7 +34,7 @@ class DownscalingUtils( object ):
 			output GeoTiff.  If False, no compression is applied.
 			* this can also be added (along with many other gdal creation options)
 			to the template meta as a key value pair template_meta.update( compress='lzw' ).
-			See Rasterio documentation for more details. 
+			See Rasterio documentation for more details. This is just a common one that is 
 
 		RETURNS:
 		--------
@@ -151,9 +157,28 @@ class DownscalingUtils( object ):
 		zi = griddata( (x, y), z, grid, method=method )
 		zi = np.flipud( zi.astype( output_dtype ) )
 		return zi
-	# make this a simple regrid command instead of interpolating the anomalies
+	def calc_anomalies( self, fn, variable, climatology_begin='1961', climatology_end='1990', absolute=True, *args, **kwargs ):
+		'''
+		calculate absolute or relative anomalies given a NetCDF file
+		of the Climatic Research Unit (CRU) Historical Time Series.
+		'''
+		import xray
+		ds = xray.open_dataset( fn )
+		try:
+			clim_ds = ds.loc[ {'time':slice(climatology_begin, climatology_end)} ]
+			climatology = clim_ds[ variable ].groupby( 'time.month' ).mean( 'time' )
+		except:
+			AttributeError( 'cannot slice netcdf based on climatology years given. they must overlap.' )
+		# calculate anomalies
+		if absolute == True:
+			anomalies = ds[ variable ].groupby( 'time.month' ) - climatology
+		elif absolute == False:
+			anomalies = ds[ variable ].groupby( 'time.month' ) / climatology
+		else:
+			AttributeError( 'calc_anomalies: absolute can only be True or False' )
+		return anomalies
 	def interpolate_anomalies( self, anom_df, meshgrid_tuple, template_raster_fn, lons_pcll, \
-		src_transform, src_crs, src_nodata, output_filename, write_anomalies, *args, **kwargs ):
+								src_transform, src_crs, src_nodata, output_filename, write_anomalies, *args, **kwargs ):
 		'''
 		run the interpolation to a grid, and reprojection / resampling to the Alaska / Canada rasters
 		extent, resolution, origin (template_raster).
@@ -216,7 +241,7 @@ class DownscalingUtils( object ):
 			AttributeError( 'interpolate_anomalies: write_anomalies can be True or False only.')
 		return out
 	def downscale( self, anom_arr, baseline_arr, output_filename, \
-		downscaling_operation, meta, post_downscale_function, *args, **kwargs ):
+					downscaling_operation, meta, post_downscale_function, *args, **kwargs ):
 		'''
 		downscale an anomaly array with a baseline array from the same period.
 
@@ -278,115 +303,68 @@ class DownscalingUtils( object ):
 			out.write( output_arr, 1 )
 		return output_filename
 
+class DownscaleCRU( object ):
+	'''
+	methods to downscale the Climatic Research Unit's (CRU) Historical 
+	Time Series data using a 12-month climatology pre-processed to the final
+	output domain and resolution.  Typically we use a PRISM climatology or a 
+	CRU CL2.0 climatology for these purposes.
 
-class DownscaleAR5( object ):
-	def __init__( self, ar5_modeled=None, ar5_historical=None, base_path=None, clim_path=None, climatology_begin='1961', climatology_end='1990', \
-		plev=None, absolute=True, metric='metric', variable=None, ncores=2, post_downscale_function=None, src_crs={'init':'epsg:3338'}, write_anomalies=True, *args, **kwargs ):
-		'''
-		NEW METHODS FOR AR5 DOWNSCALING USING THE NEW
-		API-ECOSYSTEM.
-		'''
-		self.ar5_modeled = ar5_modeled
-		self.ar5_historical = ar5_historical
-		self.base_path = base_path
+	'''
+	def __init__( self, cru_ts, clim_path, template_raster_fn, base_path, climatology_begin='1961', climatology_end='1990', ncores=2, \
+					absolute=True, metric='metric', variable=None, post_downscale_function=None, src_crs={'init':'epsg:4326'}, write_anomalies=True, *args, **kwargs ):
+		self.cru_ts = cru_ts
 		self.clim_path = clim_path
+		self.template_raster_fn = template_raster_fn
+		self.base_path = base_path
 		self.climatology_begin = climatology_begin
 		self.climatology_end = climatology_end
-		self.plev = plev
+		self.ncores = ncores
 		self.absolute = absolute
 		self.metric = metric
 		self.variable = variable
-		self.ncores = ncores
-		self.utils = DownscalingUtils()
 		self.post_downscale_function = post_downscale_function
 		self.src_crs = src_crs
+		self.utils = DownscalingUtils()
 		self.write_anomalies = write_anomalies
 
-	@staticmethod
-	def standardized_fn_to_vars( fn ):
-		''' take a filename string following the convention for this downscaling and break into parts and return a dict'''
-		name_convention = [ 'variable', 'cmor_table', 'model', 'scenario', 'experiment', 'begin_time', 'end_time' ]
-		fn = os.path.basename( fn )
-		fn_list = fn.split( '.' )[0].split( '_' )
-		return { i:j for i,j in zip( name_convention, fn_list ) }
-	def _calc_anomalies( self, *args, **kwargs ):
-		'''
-		calculate absolute or relative anomalies given a NetCDF file
-		of the Climatic Research Unit (CRU) Historical Time Series.
-		'''
-		import xray
-		# handle modeled vs. historical
-		if self.ar5_modeled != None and self.ar5_historical != None:
-			# parse the input name for some file metadata HARDWIRED!
-			output_naming_dict = self.standardized_fn_to_vars( self.ar5_modeled )
-			variable = output_naming_dict[ 'variable' ]
-
-			# read in both modeled and historical
-			ds = xray.open_dataset( self.ar5_modeled )
-			ds = ds[ variable ]
-			clim_ds = xray.open_dataset( self.ar5_historical )
-			# climatology
-			clim_ds = clim_ds.loc[ {'time':slice(self.climatology_begin,self.climatology_end)} ]
-			climatology = clim_ds[ variable ].groupby( 'time.month' ).mean( 'time' )
-			del clim_ds
-
-		elif self.ar5_historical is not None and self.ar5_modeled is None:
-			output_naming_dict = standardized_fn_to_vars( self.ar5_historical )
-			variable = output_naming_dict[ 'variable' ]
-
-			# read in historical
-			ds = xray.open_dataset( self.ar5_historical )
-			# climatology
-			climatology = ds.loc[ {'time':slice(self.climatology_begin,self.climatology_end)} ]
-			climatology = climatology[ variable ].groupby( 'time.month' ).mean( 'time' )
-
-		else:
-			NameError( 'ERROR: must have both ar5_modeled and ar5_historical, or just ar5_historical' )
-
-		if self.plev is not None:
-			plevel, = np.where( ds.plev == self.plev )
-			ds = ds[ :, plevel[0], ... ]
-			climatology = climatology[ :, plevel[0], ... ]
-
-		# anomalies
-		if self.absolute == True:
-			anomalies = ds.groupby( 'time.month' ) - climatology
-		elif self.absolute == False:
-			anomalies = ds.groupby( 'time.month' ) / climatology
-		else:
-			AttributeError( '_calc_anomalies (ar5): absolute can only be True or False' )
-		return anomalies
-	def _get_varname_ar5( self, *args, **kwargs ):
-		'''
-		take as input the AR5 netcdf filename and return (if possible)
-		the name of the variable we want to work on from that netcdf.
-
-		Arguments:
-			nc_fn = [str] filepath to the AR5 ts* netcdf file used in downscaling
-
-		Returns:
-			the variable name as a string if it can be deduced, and errors if
-			the variable name cannot be deduced.
-
-		'''
-		return os.path.basename( self.ar5_historical ).split( '_' )[0]
-	def _calc_ar5_affine( self, *args, **kwargs ):
-		'''
-		this assumes 0-360 longitudes and
-		WGS84 LatLong.
-		'''
-		import affine, xray
-		ds = xray.open_dataset( self.ar5_modeled )
-		lat_shape, lon_shape = ds.dims[ 'lat' ], ds.dims[ 'lon' ]
-		lat_res = 180.0 / lat_shape
-		lon_res = 360.0 / lon_shape
-		return affine.Affine( lon_res, 0.0, 0.0, 0.0, -lat_res, 360.0 )
 	@staticmethod
 	def _fn_month_grouper( fn, *args, **kwargs ):
 		'''
 		take a filename and return the month element of the naming convention
 		'''
 		return os.path.splitext( os.path.basename( fn ) )[0].split( '_' )[-2]
+	def _get_varname_cru( self, *args, **kwargs ):
+		'''
+		take as input the cru ts3* netcdf filename and return (if possible)
+		the name of the variable we want to work on from that netcdf.
+
+		Arguments:
+			nc_fn = [str] filepath to the cru ts* netcdf file used in downscaling
+
+		Returns:
+			the variable name as a string if it can be deduced, and errors if
+			the variable name cannot be deduced.
+
+		'''
+		ds = xray.open_dataset( self.cru_ts )
+		variables = ds.variables.keys()
+		variable = [ variable for variable in variables \
+						if variable not in [u'lon', u'lat', u'time'] ]
+		if len( variable ) == 1:
+			variable = variable[ 0 ]
+		else:
+			AttributeError( 'cannot deduce the variable from the file. supply nc_varname and re-run' )
+		return variable
+	def _get_years_cru( self, *args, **kwargs ):
+		ds = xray.open_dataset( self.cru_ts )
+		time = pd.DatetimeIndex( ds.time.values )
+		years = [ year.year for year in time ]
+		return years
+	def _get_version_cru( self, *args, **kwargs ):
+		version = ''.join( os.path.basename( self.cru_ts ).split( '.' )[:2] )
+		version = version.replace( 'ts', 'TS' ) # to follow convention
+		return version
 	def _interp_downscale_wrapper( self, args_dict, *args, **kwargs  ):
 		'''
 		interpolate anomalies and downscale to the baseline arr
@@ -401,28 +379,27 @@ class DownscaleAR5( object ):
 			meta = rst.meta
 			meta.update( compress='lzw' )
 			anom_arr = rst.read( 1 )
-		elif isinstance( anom, tuple ):
+		elif isinstance( anom, tuple ): # isinstance( anom, tuple ):
 			anom_arr, meta = anom
 		else:
 			AttributeError( '_interp_downscale_wrapper: passed wrong instance type' )
 
 		args_dict.update( output_filename=output_filename, anom_arr=anom_arr, meta=meta )
 		return self.utils.downscale( **args_dict )
-	def downscale_ar5_ts( self, *args, **kwargs ):
-		#  * * * * * * * * * *
-		# template setup
+	def downscale_cru_ts( self, *args, **kwargs ):
+		'''
+		run the CRU downscaling using the monthly climatology files given
+		'''
 		from pathos.mp_map import mp_map
 		import glob, affine, rasterio
 
-		nc_varname = self._get_varname_ar5()
+		nc_varname = self._get_varname_cru( )
 		# handle cases where the desired varname != one parsed from file.
 		if self.variable == None:
 			variable = nc_varname
 		else:
 			variable = self.variable
 		
-		print variable
-
 		# build output dirs
 		anomalies_path = os.path.join( base_path, variable, 'anom' )
 		if not os.path.exists( anomalies_path ):
@@ -432,10 +409,16 @@ class DownscaleAR5( object ):
 		if not os.path.exists( downscaled_path ):
 			os.makedirs( downscaled_path )
 
-		#  * * * * * * * * * *
+		# template setup 
+		template_raster = rasterio.open( self.template_raster_fn )
+		template_meta = template_raster.meta
+		template_meta.update( crs={'init':'epsg:3338'} )
 
-		# calc the anomalies
-		anomalies = self._calc_anomalies()
+		# make a mask with values of 0=nodata and 1=data
+		template_raster_mask = template_raster.read_masks( 1 ) # mask of band 1 is all we need
+		template_raster_mask[ template_raster_mask == 255 ] = 1
+
+		anomalies = self.utils.calc_anomalies( self.cru_ts, variable, absolute=self.absolute )
 		anomalies_pcll, lons_pcll = self.utils.shiftgrid( 0., anomalies, anomalies.lon.data ) # grabs lons from the xray ds
 
 		# mesh the lons and lats and unravel them to 1-D
@@ -445,24 +428,24 @@ class DownscaleAR5( object ):
 		anom_df_list = [ pd.DataFrame({ 'anom':i.ravel(), 'lat':la, 'lon':lo }).dropna( axis=0, how='any' ) for i in anomalies_pcll ]
 		xi, yi = np.meshgrid( lons_pcll, anomalies.lat.data )
 
-		# some metadata
-		src_transform = self._calc_ar5_affine()
 		# argument setup -- HARDWIRED
-		src_nodata = None # DangerTown
-		# src_crs = {'init':'epsg:4326'} # DangerTown
-
+		src_transform = affine.Affine( 0.5, 0.0, -180.0, 0.0, -0.5, 90.0 )
+		src_nodata = -9999.0
+			
 		# output_filenames setup
-		dates = anomalies.time.to_pandas()
-		years = np.unique( dates.apply( lambda x: x.year ) ).tolist()
+		years = np.unique( self._get_years_cru( self.cru_ts ) )
+		cru_ts_version = self._get_version_cru( self.cru_ts ) # works if naming convention stays same
 		months = [ i if len(i)==2 else '0'+i for i in np.arange( 1, 12+1, 1 ).astype( str ).tolist() ]
 		month_year = [ (month, year) for year in years for month in months ]
 
+		output_filenames = [ os.path.join( anomalies_path, '_'.join([ variable, self.metric, cru_ts_version, 'anom', month, str(year) ])+'.tif' )
+								for month, year in month_year ]
+
+		# NEW
 		# read in the pre-processed 12-month climatology
 		clim_list = sorted( glob.glob( os.path.join( self.clim_path, '*.tif' ) ) ) # this could catch you.
 		clim_dict = { month:rasterio.open( fn ).read( 1 ) for month, fn in zip( months, clim_list ) }
-		
-		# [!] THIS BELOW NEEDS RE-WORKING FOR THE AR5 DATA MODELED DATA 
-		output_filenames = [ os.path.join( downscaled_path, '_'.join([ variable, self.metric, 'ar5', 'downscaled', month, str(year) ])+'.tif' )
+		output_filenames = [ os.path.join( downscaled_path, '_'.join([ variable, self.metric, cru_ts_version, 'downscaled', month, str(year) ])+'.tif' )
 								for month, year in month_year ]
 
 		# set downscaling_operation based on self.absolute boolean
@@ -478,8 +461,8 @@ class DownscaleAR5( object ):
 						'template_raster_fn':template_raster_fn, 
 						'lons_pcll':lons_pcll, 
 						'src_transform':src_transform, 
-						'src_crs':self.src_crs,
-						'src_nodata':src_nodata,
+						'src_crs':self.src_crs, \
+						'src_nodata':src_nodata, 
 						'output_filename':out_fn,
 						'baseline_arr':clim_dict[ self._fn_month_grouper( out_fn ) ],
 						'downscaling_operation':downscaling_operation, 
@@ -488,23 +471,27 @@ class DownscaleAR5( object ):
 							for anom_df, out_fn in zip( anom_df_list, output_filenames ) ]
 
 		# run anomalies interpolation and downscaling in a single go.
-		# ( anom_df, meshgrid_tuple, template_raster_fn, lons_pcll, src_transform, src_crs, src_nodata, output_filename, write_anomalies ) 	
 		out = mp_map( lambda args: self._interp_downscale_wrapper( args_dict=args ), args_list, nproc=self.ncores )
 		return 'downscaling complete. files output at: %s' % base_path
 
 if __name__ == '__main__':
 	# * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
-	# example of use of the new DownscaleAR5 / DownscalingUtils classes
+	# example of use of the new DownscaleCRU / DownscalingUtils classes
 	# * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 
-	# input args
-	ar5_modeled = '/workspace/Shared/Tech_Projects/ESGF_Data_Access/project_data/data/prepped/clt_prepped/IPSL-CM5A-LR/clt/clt_Amon_IPSL-CM5A-LR_rcp26_r1i1p1_200601_210012.nc'
-	ar5_historical = '/workspace/Shared/Tech_Projects/ESGF_Data_Access/project_data/data/prepped/clt_prepped/IPSL-CM5A-LR/clt/clt_Amon_IPSL-CM5A-LR_historical_r1i1p1_185001_200512.nc'
+	# example of post_downscale_function - pass in at DownscaleCRU()
+	def clamp_vals( x ):
+		''' clamp the values following the relative humidity downscaling '''
+		x[ (x > 100) & (x < 500) ] = 95
+		return x
+
+	# minimum required arguments
+	cru_ts = '/Data/Base_Data/Climate/World/CRU_grids/CRU_TS323/cru_ts3.23.1901.2014.cld.dat.nc'
 	clim_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_october_final/cru_cl20/cld/akcan'
 	template_raster_fn = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/templates/tas_mean_C_AR5_GFDL-CM3_historical_01_1860.tif'
-	base_path = '/atlas_scratch/malindgren/CMIP5/TEST_AR5'
-
-	# EXAMPLE RUN -- TESTING
-	down = DownscaleAR5( ar5_modeled, ar5_historical, base_path, clim_path, ncores=32) #, climatology_begin, climatology_end, plev, absolute, metric, ncores )
-	output = down.downscale_ar5_ts()
+	base_path = '/atlas_scratch/malindgren/CMIP5'
+	
+	# run example
+	down = DownscaleCRU( cru_ts, clim_path, template_raster_fn, base_path, absolute=False, ncores=32 )
+	output = down.downscale_cru_ts()
 

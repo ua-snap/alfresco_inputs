@@ -1,9 +1,10 @@
 # # # # #
 # Tool to downscale the CMIP5 data from the PCMDI group. 
 # # # # #
-import rasterio, xray, os, glob
+import rasterio, xray, os
 import numpy as np
 import pandas as pd
+import numpy as np
 
 class DownscalingUtils( object ):
 	def write_gtiff( self, output_arr, template_meta, output_filename, compress=True ):
@@ -281,7 +282,7 @@ class DownscalingUtils( object ):
 
 class DownscaleAR5( object ):
 	def __init__( self, ar5_modeled=None, ar5_historical=None, base_path=None, clim_path=None, climatology_begin='1961', climatology_end='1990', \
-		plev=None, absolute=True, metric='metric', variable=None, ncores=2, post_downscale_function=None, src_crs={'init':'epsg:3338'}, write_anomalies=True, *args, **kwargs ):
+		plev=None, absolute=True, metric='metric', variable=None, ncores=2, *args, **kwargs ):
 		'''
 		NEW METHODS FOR AR5 DOWNSCALING USING THE NEW
 		API-ECOSYSTEM.
@@ -298,9 +299,6 @@ class DownscaleAR5( object ):
 		self.variable = variable
 		self.ncores = ncores
 		self.utils = DownscalingUtils()
-		self.post_downscale_function = post_downscale_function
-		self.src_crs = src_crs
-		self.write_anomalies = write_anomalies
 
 	@staticmethod
 	def standardized_fn_to_vars( fn ):
@@ -315,10 +313,11 @@ class DownscaleAR5( object ):
 		of the Climatic Research Unit (CRU) Historical Time Series.
 		'''
 		import xray
+
 		# handle modeled vs. historical
 		if self.ar5_modeled != None and self.ar5_historical != None:
 			# parse the input name for some file metadata HARDWIRED!
-			output_naming_dict = self.standardized_fn_to_vars( self.ar5_modeled )
+			output_naming_dict = DownscaleAR5.standardized_fn_to_vars( self.ar5_modeled )
 			variable = output_naming_dict[ 'variable' ]
 
 			# read in both modeled and historical
@@ -356,37 +355,7 @@ class DownscaleAR5( object ):
 		else:
 			AttributeError( '_calc_anomalies (ar5): absolute can only be True or False' )
 		return anomalies
-	def _get_varname_ar5( self, *args, **kwargs ):
-		'''
-		take as input the AR5 netcdf filename and return (if possible)
-		the name of the variable we want to work on from that netcdf.
-
-		Arguments:
-			nc_fn = [str] filepath to the AR5 ts* netcdf file used in downscaling
-
-		Returns:
-			the variable name as a string if it can be deduced, and errors if
-			the variable name cannot be deduced.
-
-		'''
-		return os.path.basename( self.ar5_historical ).split( '_' )[0]
-	def _calc_ar5_affine( self, *args, **kwargs ):
-		'''
-		this assumes 0-360 longitudes and
-		WGS84 LatLong.
-		'''
-		import affine, xray
-		ds = xray.open_dataset( self.ar5_modeled )
-		lat_shape, lon_shape = ds.dims[ 'lat' ], ds.dims[ 'lon' ]
-		lat_res = 180.0 / lat_shape
-		lon_res = 360.0 / lon_shape
-		return affine.Affine( lon_res, 0.0, 0.0, 0.0, -lat_res, 360.0 )
-	@staticmethod
-	def _fn_month_grouper( fn, *args, **kwargs ):
-		'''
-		take a filename and return the month element of the naming convention
-		'''
-		return os.path.splitext( os.path.basename( fn ) )[0].split( '_' )[-2]
+	
 	def _interp_downscale_wrapper( self, args_dict, *args, **kwargs  ):
 		'''
 		interpolate anomalies and downscale to the baseline arr
@@ -408,31 +377,13 @@ class DownscaleAR5( object ):
 
 		args_dict.update( output_filename=output_filename, anom_arr=anom_arr, meta=meta )
 		return self.utils.downscale( **args_dict )
-	def downscale_ar5_ts( self, *args, **kwargs ):
-		#  * * * * * * * * * *
-		# template setup
-		from pathos.mp_map import mp_map
-		import glob, affine, rasterio
 
-		nc_varname = self._get_varname_ar5()
-		# handle cases where the desired varname != one parsed from file.
-		if self.variable == None:
-			variable = nc_varname
-		else:
-			variable = self.variable
-		
-		print variable
+	def downscale_ar5_ts( self, *args, **kwargs ):
+		from pathos.mp_map import mp_map
 
 		# build output dirs
-		anomalies_path = os.path.join( base_path, variable, 'anom' )
-		if not os.path.exists( anomalies_path ):
-			os.makedirs( anomalies_path )
 
-		downscaled_path = os.path.join( base_path, variable, 'downscaled' )
-		if not os.path.exists( downscaled_path ):
-			os.makedirs( downscaled_path )
-
-		#  * * * * * * * * * *
+		# template setup
 
 		# calc the anomalies
 		anomalies = self._calc_anomalies()
@@ -445,24 +396,23 @@ class DownscaleAR5( object ):
 		anom_df_list = [ pd.DataFrame({ 'anom':i.ravel(), 'lat':la, 'lon':lo }).dropna( axis=0, how='any' ) for i in anomalies_pcll ]
 		xi, yi = np.meshgrid( lons_pcll, anomalies.lat.data )
 
-		# some metadata
-		src_transform = self._calc_ar5_affine()
 		# argument setup -- HARDWIRED
-		src_nodata = None # DangerTown
-		# src_crs = {'init':'epsg:4326'} # DangerTown
+		# src_transform = affine.Affine( 0.5, 0.0, -180.0, 0.0, -0.5, 90.0 )
+		# src_nodata = -9999.0
+		# [!] THE ABOVE ARE INCORRECT FOR THE MODELED DATA
+
 
 		# output_filenames setup
-		dates = anomalies.time.to_pandas()
-		years = np.unique( dates.apply( lambda x: x.year ) ).tolist()
+		dates = ds.time.to_pandas()
+		years = dates.apply( lambda x: x.year ).tolist()
 		months = [ i if len(i)==2 else '0'+i for i in np.arange( 1, 12+1, 1 ).astype( str ).tolist() ]
 		month_year = [ (month, year) for year in years for month in months ]
 
 		# read in the pre-processed 12-month climatology
 		clim_list = sorted( glob.glob( os.path.join( self.clim_path, '*.tif' ) ) ) # this could catch you.
 		clim_dict = { month:rasterio.open( fn ).read( 1 ) for month, fn in zip( months, clim_list ) }
-		
-		# [!] THIS BELOW NEEDS RE-WORKING FOR THE AR5 DATA MODELED DATA 
-		output_filenames = [ os.path.join( downscaled_path, '_'.join([ variable, self.metric, 'ar5', 'downscaled', month, str(year) ])+'.tif' )
+		# [!] THIS BELOW NEEDS RE-WORKING FOR THE AR5 DATA MODELED DATA
+		output_filenames = [ os.path.join( downscaled_path, '_'.join([ variable, self.metric, cru_ts_version, 'downscaled', month, str(year) ])+'.tif' )
 								for month, year in month_year ]
 
 		# set downscaling_operation based on self.absolute boolean
@@ -478,8 +428,8 @@ class DownscaleAR5( object ):
 						'template_raster_fn':template_raster_fn, 
 						'lons_pcll':lons_pcll, 
 						'src_transform':src_transform, 
-						'src_crs':self.src_crs,
-						'src_nodata':src_nodata,
+						'src_crs':self.src_crs, \
+						'src_nodata':src_nodata, 
 						'output_filename':out_fn,
 						'baseline_arr':clim_dict[ self._fn_month_grouper( out_fn ) ],
 						'downscaling_operation':downscaling_operation, 
@@ -494,17 +444,288 @@ class DownscaleAR5( object ):
 
 if __name__ == '__main__':
 	# * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
-	# example of use of the new DownscaleAR5 / DownscalingUtils classes
+	# example of use of the new DownscaleCRU / DownscalingUtils classes
 	# * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+
+	import os, rasterio, xray, glob
+	import pandas as pd
+	import numpy as np
 
 	# input args
 	ar5_modeled = '/workspace/Shared/Tech_Projects/ESGF_Data_Access/project_data/data/prepped/clt_prepped/IPSL-CM5A-LR/clt/clt_Amon_IPSL-CM5A-LR_rcp26_r1i1p1_200601_210012.nc'
 	ar5_historical = '/workspace/Shared/Tech_Projects/ESGF_Data_Access/project_data/data/prepped/clt_prepped/IPSL-CM5A-LR/clt/clt_Amon_IPSL-CM5A-LR_historical_r1i1p1_185001_200512.nc'
 	clim_path = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/cru_october_final/cru_cl20/cld/akcan'
 	template_raster_fn = '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/TEM_Data/templates/tas_mean_C_AR5_GFDL-CM3_historical_01_1860.tif'
-	base_path = '/atlas_scratch/malindgren/CMIP5/TEST_AR5'
+	base_path = '/atlas_scratch/malindgren/CMIP5'
 
 	# EXAMPLE RUN -- TESTING
 	down = DownscaleAR5( ar5_modeled, ar5_historical, base_path, clim_path, ncores=32) #, climatology_begin, climatology_end, plev, absolute, metric, ncores )
 	output = down.downscale_ar5_ts()
 
+
+# # # OLD SHIT BELOW 
+
+
+# if __name__ == '__main__':
+# 	import pandas as pd
+# 	import numpy as np
+# 	import os, sys, re, xray, rasterio, glob, argparse
+# 	from rasterio import Affine as A
+# 	from rasterio.warp import reproject, RESAMPLING
+# 	from pathos import multiprocessing as mp
+
+# 	# parse the commandline arguments
+# 	parser = argparse.ArgumentParser( description='preprocess cmip5 input netcdf files to a common type and single files' )
+# 	parser.add_argument( "-mi", "--modeled_fn", nargs='?', const=None, action='store', dest='modeled_fn', type=str, help="path to modeled input filename (NetCDF); default:None" )
+# 	parser.add_argument( "-hi", "--historical_fn", nargs='?', const=None, action='store', dest='historical_fn', type=str, help="path to historical input filename (NetCDF); default:None" )
+# 	parser.add_argument( "-o", "--output_path", action='store', dest='output_path', type=str, help="string path to the output folder containing the new downscaled outputs" )
+# 	parser.add_argument( "-cbt", "--climatology_begin_time", nargs='?', const='196101', action='store', dest='climatology_begin', type=str, help="string in format YYYYMM or YYYY of the beginning month and potentially (year) of the climatology period" )
+# 	parser.add_argument( "-cet", "--climatology_end_time", nargs='?', const='199012', action='store', dest='climatology_end', type=str, help="string in format YYYYMM or YYYY of the ending month and potentially (year) of the climatology period" )
+# 	parser.add_argument( "-plev", "--plev", nargs='?', const=None, action='store', dest='plev', type=int, help="integer value (in millibars) of the desired pressure level to extract, if there is one." )
+# 	parser.add_argument( "-cru", "--cru_path", action='store', dest='cru_path', type=str, help="path to the directory storing the cru climatology data derived from CL2.0" )
+# 	parser.add_argument( "-at", "--anomalies_calc_type", nargs='?', const='absolute', action='store', dest='anomalies_calc_type', type=str, help="string of 'proportional' or 'absolute' to inform of anomalies calculation type to perform." )
+# 	parser.add_argument( "-m", "--metric", nargs='?', const='metric', action='store', dest='metric', type=str, help="string of whatever the metric type is of the outputs to put in the filename." )
+# 	parser.add_argument( "-dso", "--downscale_operation", action='store', dest='downscale_operation', type=str, help="string of 'add', 'mult', 'div', which refers to the type or downscaling operation to use." )
+# 	parser.add_argument( "-nc", "--ncores", nargs='?', const=2, action='store', dest='ncores', type=int, help="integer valueof number of cores to use. default:2" )
+
+# 	# parse args
+# 	args = parser.parse_args()
+
+# 	# unpack args
+# 	modeled_fn = args.modeled_fn
+# 	historical_fn = args.historical_fn
+# 	output_path = args.output_path
+# 	climatology_begin = args.climatology_begin
+# 	climatology_end = args.climatology_end
+# 	plev = args.plev
+# 	cru_path = args.cru_path
+# 	anomalies_calc_type = args.anomalies_calc_type
+# 	metric = args.metric
+# 	downscale_operation = args.downscale_operation
+# 	ncores = args.ncores
+
+
+
+# # * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * 
+# 	# THIS APPEARS TO BE THE MAIN NOT THE DOWNSCALER.
+# 	def downscale( src, dst, cru, src_crs, src_affine, dst_crs, dst_affine, output_filename, dst_meta, variable,\
+# 		method='cubic_spline', operation='add', output_dtype='float32', **kwargs ):
+# 		'''
+# 		operation can be one of two keywords for the operation to perform the delta downscaling
+# 		- keyword strings are one of: 'add'= addition, 'mult'=multiplication, or 'div'=division (not implemented)
+# 		- method can be one of 'cubic_spline', 'nearest', 'bilinear' and must be input as a string.
+# 		- output_dtype can be one of 'int32', 'float32'
+# 		'''
+# 		from rasterio.warp import reproject, RESAMPLING
+# 		def add( cru, anom ):
+# 			return cru + anom
+# 		def mult( cru, anom ):
+# 			return cru * anom
+# 		def div( cru, anom ):
+# 			# return cru / anom
+# 			# this one may not be useful, but the placeholder is here 
+# 			return NotImplementedError
+
+# 		# switch to deal with numeric output dtypes
+# 		dtypes_switch = {'int32':np.int32, 'float32':np.float32}
+
+# 		# switch to deal with different resampling types
+# 		method_switch = { 'nearest':RESAMPLING.nearest, 'bilinear':RESAMPLING.bilinear, 'cubic_spline':RESAMPLING.cubic_spline }
+# 		method = method_switch[ method ]
+
+# 		# reproject src to dst
+# 		out = np.zeros( dst.shape ) 
+# 		reproject( src,
+# 					out,
+# 					src_transform=src_affine,
+# 					src_crs=src_crs,
+# 					dst_transform=dst_affine,
+# 					dst_crs=dst_crs,
+# 					resampling=method )
+# 		# switch to deal with different downscaling operators
+# 		operation_switch = { 'add':add, 'mult':mult, 'div':div }
+# 		downscaled = operation_switch[ operation ]( cru, out )
+
+# 		# reset any > 100 values to 95 if the variable is cld or hur
+# 		if variable == 'clt' or variable == 'hur' or variable == 'cld':
+# 			downscaled[ downscaled > 100.0 ] = 95.0
+
+# 		# give the proper fill values to the oob regions
+# 		downscaled.fill_value = dst_meta['nodata']
+# 		downscaled = downscaled.filled()
+
+# 		# this is a geotiff creator so lets pass in the lzw compression
+# 		dst_meta.update( compress='lzw' )
+# 		with rasterio.open( output_filename, 'w', **dst_meta ) as out:
+# 			out.write( downscaled.astype( dtypes_switch[ output_dtype ] ), 1 )
+# 		return output_filename
+
+
+
+
+
+
+
+
+
+	# * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+	# [NOTE]: hardwired raster metadata meeting the ALFRESCO Model's needs for 
+	# perfectly aligned inputs this is used as template metadata that 
+	# is used in output generation. template raster filename below:
+	# '/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/
+	#	TEM_Data/templates/tas_mean_C_AR5_GFDL-CM3_historical_01_1860.tif'
+	 # NO! 
+	# meta_3338 = {'affine': A(2000.0, 0.0, -2173223.206087799, 
+	# 				0.0, -2000.0, 2548412.932644147),
+	# 			'count': 1,
+	# 			'crs': {'init':'epsg:3338'},
+	# 			'driver': u'GTiff',
+	# 			'dtype': 'float32',
+	# 			'height': 1186,
+	# 			'nodata': -3.4e+38,
+	# 			'width': 3218,
+	# 			'compress':'lzw'}
+
+	# # output template numpy array same dimensions as the template
+	# dst = np.empty( (1186, 3218) )
+	
+	# # * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+	# # condition to deal with reading in historical data if needed.
+	# if modeled_fn != None and historical_fn != None:
+	# 	# parse the input name for some file metadata
+	# 	output_naming_dict = standardized_fn_to_vars( modeled_fn )
+
+	# 	# this is to maintain cleanliness
+	# 	variable = output_naming_dict[ 'variable' ]
+
+	# 	# read in both modeled and historical
+	# 	ds = xray.open_dataset( modeled_fn )
+	# 	ds = ds[ variable ].load()
+	# 	clim_ds = xray.open_dataset( historical_fn )
+	# 	clim_ds = clim_ds[ variable ].load()
+	# 	# generate climatology / anomalies
+	# 	clim_ds = clim_ds.loc[ {'time':slice(climatology_begin,climatology_end)} ]
+	# 	climatology = clim_ds.groupby( 'time.month' ).mean( 'time' )
+
+	# 	# find the begin/end years of the prepped files
+	# 	dates = ds.time.to_pandas()
+	# 	years = dates.apply( lambda x: x.year )
+	# 	begin_time = years.min()
+	# 	end_time = years.max()
+
+	# 	del clim_ds
+	# elif historical_fn is not None and modeled_fn is None:
+	# 	# parse the input name for some file metadata
+	# 	output_naming_dict = standardized_fn_to_vars( historical_fn )
+		
+	# 	# this is to maintain cleanliness
+	# 	variable = output_naming_dict[ 'variable' ]
+
+	# 	# read in historical
+	# 	ds = xray.open_dataset( historical_fn )
+	# 	ds = ds[ variable ].load()
+	# 	# generate climatology / anomalies
+	# 	climatology = ds.loc[ {'time':slice(climatology_begin,climatology_end)} ]
+	# 	climatology = climatology.groupby( 'time.month' ).mean( 'time' )
+
+	# 	# find the begin/end years of the prepped files
+	# 	dates = ds.time.to_pandas()
+	# 	years = dates.apply( lambda x: x.year )
+	# 	begin_time = years.min()
+	# 	end_time = years.max()
+
+	# else:
+	# 	NameError( 'ERROR: must have both modeled_fn and historical_fn, or just historical_fn' )
+
+	# standardize the output pathing
+	if output_naming_dict[ 'variable' ] == 'clt':
+		variable_out = 'cld'
+	else:
+		variable_out = output_naming_dict[ 'variable' ]
+
+	output_path = os.path.join( output_path, 'ar5', output_naming_dict['model'], variable_out, 'downscaled' )
+	if not os.path.exists( output_path ):
+		os.makedirs( output_path )
+
+
+	# # if there is a pressure level to extract, extract it
+	# if plev is not None:
+	# 	plevel, = np.where( ds.plev == plev )
+	# 	ds = ds[ :, plevel[0], ... ]
+	# 	climatology = climatology[ :, plevel[0], ... ]
+
+	# deal with different anomaly calculation types
+	if anomalies_calc_type == 'absolute':
+		anomalies = ds.groupby( 'time.month' ) - climatology
+	elif anomalies_calc_type == 'proportional':
+		anomalies = ds.groupby( 'time.month' ) / climatology
+	else:
+		NameError( 'anomalies_calc_type can only be one of "absolute" or "proportional"' )
+
+	# some setup of the output raster metadata
+	time_len, rows, cols = anomalies.shape
+	crs = 'epsg:4326'
+	affine = A( *[np.diff( ds.lon )[ 0 ], 0.0, -180.0, 0.0, -np.diff( ds.lat )[ 0 ], 90.0] )
+	count = time_len
+	resolution = ( np.diff( ds.lat )[ 0 ], np.diff( ds.lon )[ 0 ] )
+
+	# close the dataset and clean it up
+	ds = None
+
+	# shift the grid to Greenwich Centering
+	dat, lons = shiftgrid( 180., anomalies[:], anomalies.lon.data, start=False )
+
+	# metadata for input?
+	meta_4326 = {'affine':affine,
+				'height':rows,
+				'width':cols,
+				'crs':crs,
+				'driver':'GTiff',
+				'dtype':np.float32,
+				'count':time_len,
+				'compress':'lzw' }
+	# build some filenames for the outputs to be generated
+	# months = [ '01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12' ]
+	months = [ i if len(i)==2 else '0'+i for i in np.arange( 1, 12+1, 1 ).astype( str ).tolist() ]
+
+	years = [ str(year) for year in range( begin_time, end_time + 1, 1 ) ]
+	# combine the months and the years
+	combinations = [ (month, year) for year in years for month in months ]
+
+	output_filenames = [ os.path.join( output_path, '_'.join([variable_out, 'metric', output_naming_dict['model'], output_naming_dict['scenario'], output_naming_dict['experiment'], month, year]) + '.tif' ) for month, year in combinations ]
+
+	# load the baseline CRU CL2.0 data 
+	# [NOTE]: THIS ASSUMES THEY ARE THE ONLY FILES IN THE DIRECTORY -- COULD BE A GOTCHA
+	cru_files = glob.glob( os.path.join( cru_path, '*.tif' ) )
+	cru_files.sort()
+	cru_stack = [ rasterio.open( fn ).read( 1 ) for fn in cru_files ]
+	# this is a hack to make a masked array with the cru data
+	cru_stack = [ np.ma.masked_where( cru == cru.min(), cru ) for cru in cru_stack ]
+	import itertools
+
+	cru_gen = clim_generator( len(output_filenames), cru_stack )
+
+	# cleanup some uneeded vars that are hogging RAM
+	del climatology, anomalies
+
+	# run in parallel using PATHOS
+	pool = mp.Pool( processes=ncores )
+	args_list = 
+
+	args_list = [{ 'src':src, 
+				'output_filename':fn, 
+				'dst':dst, 
+				'cru':cru, 
+				'src_crs':meta_4326[ 'crs' ], 
+				'src_affine':meta_4326[ 'affine' ],			
+				'dst_crs':meta_3338[ 'crs' ], 
+				'dst_affine':meta_3338[ 'affine' ], 
+				'dst_meta':meta_3338, 
+				'operation':downscale_operation, 
+				'variable':variable }
+				for src,fn,cru in zip( np.vsplit( dat, time_len ), output_filenames, cru_gen ) ]
+
+	del dat, cru_gen, cru_stack
+
+	out = pool.map( run, args_list )
+	pool.close()
