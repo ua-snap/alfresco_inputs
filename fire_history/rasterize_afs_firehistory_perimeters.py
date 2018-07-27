@@ -5,6 +5,7 @@
 import rasterio, os, glob
 from rasterio.features import rasterize
 import geopandas as gpd
+import pandas as pd
 import numpy as np
 
 # # input variables
