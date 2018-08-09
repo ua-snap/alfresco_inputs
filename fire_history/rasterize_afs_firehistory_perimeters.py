@@ -34,13 +34,14 @@ can_df = can_df[ can_df.YEAR != -9999 ]
 can = pd.DataFrame({'geometry': can_df.geometry, 'year':can_df.YEAR.astype(int) })
 ak = pd.DataFrame({'geometry': df.geometry, 'year':df.FIREYEAR.astype(int) })
 akcan = gpd.GeoDataFrame( pd.concat([ak, can]), geometry='geometry', crs={'init':'epsg:3338'} )
+# akcan.to_file('/workspace/Shared/Tech_Projects/ALFRESCO_Inputs/project_data/Fire/FireHistory/AK_CAN_1km/AKCanada_allfires.shp')
 
 for group, sub_df in akcan.groupby( 'year' ):
 	print( group )
-	geoms = sub_df.geometry.copy()
+	geoms = list( sub_df.geometry )
 	out_rst = rasterize( geoms, out_shape=shape, fill=0, transform=meta['transform'], all_touched=False, default_value=1, dtype=np.float32 )
 	out_rst[ mask == 0 ] = -9999
 
-	output_filename = os.path.join( out_path, 'ALF_AK_CAN_FireHistory_{}.tif'.format( year ) )
+	output_filename = os.path.join( out_path, 'ALF_AK_CAN_FireHistory_{}.tif'.format( group ) )
 	with rasterio.open( output_filename, 'w', **meta ) as out:
 		out.write( out_rst, 1 )
